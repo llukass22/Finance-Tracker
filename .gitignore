@@ -1,0 +1,19 @@
+# Dependencies and generated output
+node_modules/
+dist/
+build/
+coverage/
+
+# Local environment and credentials
+.env
+.env.*
+!.env.example
+!.env.*.example
+*.pem
+*.key
+
+# Logs and temporary files
+*.log
+*.tmp
+.DS_Store
+Thumbs.db
