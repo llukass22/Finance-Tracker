@@ -3,22 +3,24 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 const source = readFileSync(new URL('../app.js', import.meta.url), 'utf8');
-function app(stored = null, failSave = false) {
-  const nodes = new Map(), storage = new Map();
+function app(stored = null, failSave = false, theme = null) {
+  const nodes = new Map(), storage = new Map(), windowHandlers = {};
+  const documentElement = { dataset: {} }, themeMeta = {};
   if (stored !== null) storage.set('pocket.purchases.v1', stored);
+  if (theme !== null) storage.set('pocket.theme.v1', theme);
   function node(id) {
     if (!nodes.has(id)) nodes.set(id, {
       value: id === 'period' ? 'month' : id === 'category-filter' ? 'all' : '',
       innerHTML: '', textContent: '', hidden: false, children: [], handlers: {},
-      classList: { toggle() {} }, setAttribute() {}, add() {}, focus() {},
+      attributes: {}, classList: { toggle() {} }, setAttribute(key, value) { this.attributes[key] = value; }, add() {}, focus() {},
       addEventListener(type, fn) { this.handlers[type] = fn; },
       showModal() { this.open = true; }, close() { this.open = false; }, reset() {},
     });
     return nodes.get(id);
   }
   const context = vm.createContext({
-    document: { getElementById: node, addEventListener() {} },
-    window: { addEventListener() {} },
+    document: { documentElement, querySelector() { return themeMeta; }, getElementById: node, addEventListener() {} },
+    window: { addEventListener(type, fn) { (windowHandlers[type] ||= []).push(fn); } },
     localStorage: { getItem: key => storage.get(key) ?? null, setItem(key, value) { if (failSave) throw Error('Full'); storage.set(key, value); } },
     Option: function() {}, setTimeout() { return 1; }, clearTimeout() {}, console,
   });
@@ -29,8 +31,37 @@ function app(stored = null, failSave = false) {
     node('purchase-date').value = date; node('note').value = note;
     node('purchase-form').handlers.submit({ preventDefault() {} });
   }
-  return { node, run, submit, storage };
+  return { node, run, submit, storage, documentElement, themeMeta, windowHandlers };
 }
+test('theme toggle saves preference, updates accessibility and restores on reload', () => {
+  const a = app();
+  assert.equal(a.documentElement.dataset.theme, 'light');
+  a.node('theme-button').handlers.click();
+  assert.equal(a.documentElement.dataset.theme, 'dark');
+  assert.equal(a.storage.get('pocket.theme.v1'), 'dark');
+  assert.equal(a.node('theme-button').attributes['aria-pressed'], 'true');
+  assert.equal(a.node('theme-button').attributes['aria-label'], 'Switch to light theme');
+  assert.equal(a.themeMeta.content, '#17251f');
+  const b = app(null, false, a.storage.get('pocket.theme.v1'));
+  assert.equal(b.documentElement.dataset.theme, 'dark');
+  b.node('theme-button').handlers.click();
+  assert.equal(b.storage.get('pocket.theme.v1'), 'light');
+  assert.equal(b.node('theme-button').attributes['aria-pressed'], 'false');
+});
+test('theme still switches if preference cannot be saved', () => {
+  const a = app(null, true);
+  a.node('theme-button').handlers.click();
+  assert.equal(a.documentElement.dataset.theme, 'dark');
+  assert.ok(a.node('toast-message').textContent.includes('may reset'));
+});
+test('theme follows preference changes from another tab and ignores invalid preferences', () => {
+  const a = app(null, false, 'invalid');
+  assert.equal(a.documentElement.dataset.theme, 'light');
+  for (const handler of a.windowHandlers.storage) handler({ key: 'pocket.theme.v1', newValue: 'dark' });
+  assert.equal(a.documentElement.dataset.theme, 'dark');
+  for (const handler of a.windowHandlers.storage) handler({ key: null, newValue: null });
+  assert.equal(a.documentElement.dataset.theme, 'light');
+});
 test('new tracker starts empty and lists all seven categories', () => {
   const a = app(); assert.equal(a.run('records.length'), 0);
   assert.equal(a.node('total-spent').textContent, '€0.00');
