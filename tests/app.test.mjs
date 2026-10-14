@@ -89,12 +89,12 @@ test('day, Monday-based week, month, year and all-time totals filter correctly',
     assert.equal(a.run('filtered().reduce((s,r)=>s+r.cents,0)'), expected);
   }
 });
-test('editing replaces the original record and search safely renders notes', () => {
+test('editing replaces the original record and category filtering safely renders notes', () => {
   const a = app(); a.submit('10', 'Food', '2026-10-13', '<img src=x onerror=alert(1)>');
-  assert.ok(a.node('recent-list').innerHTML.includes('&lt;img'));
+  assert.ok(a.node('history-list').innerHTML.includes('&lt;img'));
   a.run('editingId=records[0].id'); a.submit('15.25', 'Car', '2026-10-13', 'Fuel');
   assert.equal(a.run('records.length'),1); assert.equal(a.run('records[0].cents'),1525);
-  a.node('search').value='fuel'; a.run('renderHistory(filtered())');
+  a.node('category-filter').value='Car'; a.run('renderHistory(filtered())');
   assert.ok(a.node('history-list').innerHTML.includes('Fuel'));
   a.node('category-filter').value='Food'; a.run('renderHistory(filtered())');
   assert.ok(a.node('history-list').innerHTML.includes('No purchases found'));
