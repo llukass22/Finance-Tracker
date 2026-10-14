@@ -6,9 +6,17 @@
 
 /* Shared palette keeps every view and native form control in the selected theme. */
 :root{color-scheme:light;--border:#e3e8de;--soft:#f1f5e9;--field:#fafbf7;--nav:#f7f7f0f5;--button-bg:#294e40;--button-ink:#fff;--button-hover:#35604d;--error:#bb4b4b;--chart-track:#edf1e6}
-:root[data-theme="dark"]{color-scheme:dark;--bg:#17251f;--surface:#21332b;--ink:#e4eee5;--muted:#aab9a8;--line:#34483b;--green:#c0dda4;--lime:#d0e7af;--border:#34483b;--soft:#2a3e30;--field:#1b2c23;--nav:#17251ff5;--button-bg:#c0dda4;--button-ink:#17251f;--button-hover:#d0e7af;--error:#f49a9a;--chart-track:#34483b;--shadow:0 8px 30px #00000016}
+:root[data-theme="dark"]{color-scheme:dark;--bg:#101010;--surface:#1c1c1c;--ink:#ededed;--muted:#ababab;--line:#353535;--green:#dedede;--lime:#ededed;--border:#353535;--soft:#282828;--field:#161616;--nav:#101010f5;--button-bg:#dedede;--button-ink:#101010;--button-hover:#f0f0f0;--error:#f49a9a;--chart-track:#353535;--shadow:0 8px 30px #00000030}
 #spending-chart>circle:first-child{stroke:var(--chart-track)}
 [data-theme="dark"] .category-icon{background:var(--soft)}
 [data-theme="dark"] .brand-mark,[data-theme="dark"] .mobile-nav button.mobile-add{background:var(--button-bg);color:var(--button-ink)}
+[data-theme="dark"] .brand-dot{color:var(--muted)}
+[data-theme="dark"] .local-label>span{background:var(--muted)}
+[data-theme="dark"] :is(button,a,select,input):focus-visible{outline-color:#bcbcbc}
+[data-theme="dark"] dialog{box-shadow:0 20px 80px #00000060}
+[data-theme="dark"] dialog::backdrop{background:#00000080}
+[data-theme="dark"] .mobile-nav button.mobile-add{box-shadow:0 4px 8px #00000030}
+[data-theme="dark"] .toast{background:var(--soft);color:var(--ink);box-shadow:0 8px 30px #00000040}
+[data-theme="dark"] .toast button{color:var(--ink)}
 #theme-button{flex-shrink:0}
 @media(max-width:380px){.topbar{gap:6px}.local-label{font-size:9px;gap:4px}}

@@ -30,7 +30,7 @@ const THEME_KEY = 'pocket.theme.v1';
 function applyTheme(theme){
   const dark=theme==='dark';
   document.documentElement.dataset.theme=dark?'dark':'light';
-  document.querySelector('meta[name="theme-color"]').content=dark?'#17251f':'#f7f7f0';
+  document.querySelector('meta[name="theme-color"]').content=dark?'#101010':'#f7f7f0';
   const label=dark?'Switch to light theme':'Switch to dark theme';
   $('theme-button').innerHTML=icon(dark?'sun':'moon');
   $('theme-button').setAttribute('aria-label',label);
