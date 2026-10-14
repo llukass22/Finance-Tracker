@@ -41,7 +41,7 @@ test('theme toggle saves preference, updates accessibility and restores on reloa
   assert.equal(a.storage.get('pocket.theme.v1'), 'dark');
   assert.equal(a.node('theme-button').attributes['aria-pressed'], 'true');
   assert.equal(a.node('theme-button').attributes['aria-label'], 'Switch to light theme');
-  assert.equal(a.themeMeta.content, '#17251f');
+  assert.equal(a.themeMeta.content, '#101010');
   const b = app(null, false, a.storage.get('pocket.theme.v1'));
   assert.equal(b.documentElement.dataset.theme, 'dark');
   b.node('theme-button').handlers.click();
