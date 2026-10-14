@@ -10,7 +10,9 @@ drink:'<path d="M7 4h10l-1 17H8ZM6 8h12m-5 0 2-7h4"/>',
 bills:'<path d="M5 2h14v20l-3-2-4 2-4-2-3 2Zm4 5h6m-6 4h6m-6 4h3"/>',
 edit:'<path d="m15 4 5 5M3 21l5-1L21 7a2 2 0 0 0-5-5L3 15Z"/>',
 trash:'<path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7m4-7v7"/>',
-backup:'<path d="M12 3v12m-4-4 4 4 4-4M4 14v6h16v-6"/>'
+backup:'<path d="M12 3v12m-4-4 4 4 4-4M4 14v6h16v-6"/>',
+moon:'<path d="M20.9 13A9 9 0 0 1 11 3.1 9 9 0 1 0 20.9 13Z"/>',
+sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/>'
 };
 const icon = key => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[key]}</svg>`;
 const categories = [
@@ -24,6 +26,26 @@ const categories = [
 ];
 const categoryMap = new Map(categories.map(c => [c.name,c]));
 const STORAGE_KEY = 'pocket.purchases.v1';
+const THEME_KEY = 'pocket.theme.v1';
+function applyTheme(theme){
+  const dark=theme==='dark';
+  document.documentElement.dataset.theme=dark?'dark':'light';
+  document.querySelector('meta[name="theme-color"]').content=dark?'#17251f':'#f7f7f0';
+  const label=dark?'Switch to light theme':'Switch to dark theme';
+  $('theme-button').innerHTML=icon(dark?'sun':'moon');
+  $('theme-button').setAttribute('aria-label',label);
+  $('theme-button').setAttribute('aria-pressed',String(dark));
+  $('theme-button').title=label;
+}
+let initialTheme='light';
+try{initialTheme=localStorage.getItem(THEME_KEY)||'light';}catch{}
+applyTheme(initialTheme);
+$('theme-button').addEventListener('click',()=>{
+  const theme=document.documentElement.dataset.theme==='dark'?'light':'dark';
+  applyTheme(theme);
+  try{localStorage.setItem(THEME_KEY,theme);}catch{notify('Theme changed. Browser storage is unavailable, so it may reset when you reload.');}
+});
+window.addEventListener('storage',e=>{if(e.key===THEME_KEY||e.key===null)applyTheme(e.key===null?'light':e.newValue);});
 const money = cents => new Intl.NumberFormat('en-IE',{style:'currency',currency:'EUR',minimumFractionDigits:2}).format(cents/100);
 const localDate = (d=new Date()) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 const parseDate = value => new Date(`${value}T12:00:00`);
