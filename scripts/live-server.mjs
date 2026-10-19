@@ -49,7 +49,7 @@ export async function startLiveServer({ root, build, port = 3001 }) {
       }
     } finally { rebuilding = false; }
   }
-  const watched = new Set(['index.html', 'styles.css', 'app.js', 'native.js', 'purchase-storage.mjs', 'favicon.svg']);
+  const watched = new Set(['index.html', 'styles.css', 'app.js', 'native.js', 'purchase-storage.mjs', 'notification-controls.mjs', 'favicon.svg']);
   const watcher = watch(root, (_event, filename) => {
     if (!watched.has(String(filename))) return;
     clearTimeout(timer);

@@ -56,17 +56,26 @@ const escapeHTML = value => String(value).replace(/[&<>"']/g, c=>({'&':'&amp;','
 const validRecord = r => r && typeof r.id==='string' && r.id.length>0 && r.id.length<=100 && Number.isSafeInteger(r.cents) && r.cents>0 && r.cents<=99999999999 && categoryMap.has(r.category) && typeof r.note==='string' && r.note.length<=200 && validDate(r.date) && Number.isSafeInteger(r.createdAt) && r.createdAt>=0;
 const validRecords = data => Array.isArray(data)&&data.every(validRecord)&&new Set(data.map(r=>r.id)).size===data.length;
 const purchaseStorage = window.pocketNative?.purchases;
-let records=[],anchor=new Date(),editingId=null,deletedRecord=null,toastTimer,storageHealthy=true,storageReady=!purchaseStorage,saveBusy=false;
+let records=[],anchor=new Date(),editingId=null,deletedRecord=null,toastTimer,storageHealthy=true,storageReady=!purchaseStorage,saveBusy=false,storageRevision=0,refreshPending=false;
 if(!purchaseStorage)try{const raw=localStorage.getItem(STORAGE_KEY);if(raw!==null){const data=JSON.parse(raw);if(!validRecords(data))throw new Error('Invalid stored records');records=data;}}catch{storageHealthy=false;}
 async function persist(next){
   if(!storageReady){notify('Purchases are still loading. Please try again.');return false;}
   if(!storageHealthy){notify('Storage could not be read. Recover your saved data before saving.');return false;}
   if(saveBusy){notify('A purchase is still being saved. Please try again.');return false;}
   saveBusy=true;
+  storageRevision++;
   try{if(!validRecords(next))throw new Error('Invalid purchases');if(purchaseStorage){records=await purchaseStorage.save(records,next,validRecords);}else{localStorage.setItem(STORAGE_KEY,JSON.stringify(next));records=next;}return true;}
   catch{notify('Could not save. Check device storage space and try again.');return false;}
-  finally{saveBusy=false;}
+  finally{saveBusy=false;if(refreshPending){refreshPending=false;void refreshNativePurchases();}}
 }
+async function refreshNativePurchases(){
+  if(!purchaseStorage||!storageHealthy)return;
+  if(!storageReady||saveBusy){refreshPending=true;return;}
+  const revision=++storageRevision;
+  try{const data=await purchaseStorage.reload(validRecords);if(revision!==storageRevision||saveBusy){if(saveBusy)refreshPending=true;return;}records=data;render();}
+  catch{notify('Could not refresh purchases. Reopen Pocket to try again.');}
+}
+window.addEventListener('pocket-purchases-changed',refreshNativePurchases);
 function notify(message,undo=false){clearTimeout(toastTimer);$('toast-message').textContent=message;$('undo-delete').hidden=!undo;$('toast').hidden=false;toastTimer=setTimeout(()=>{$('toast').hidden=true;},undo?10000:5500);}
 function bounds(){const mode=$('period').value;let start=new Date(anchor.getFullYear(),anchor.getMonth(),anchor.getDate(),12),end=new Date(start);if(mode==='all')return {start:null,end:null};if(mode==='week'){start.setDate(start.getDate()-((start.getDay()+6)%7));end=new Date(start);end.setDate(end.getDate()+6);}if(mode==='month'){start=new Date(anchor.getFullYear(),anchor.getMonth(),1,12);end=new Date(anchor.getFullYear(),anchor.getMonth()+1,0,12);}if(mode==='year'){start=new Date(anchor.getFullYear(),0,1,12);end=new Date(anchor.getFullYear(),11,31,12);}return {start:localDate(start),end:localDate(end)};}
 function filtered(){const b=bounds();return records.filter(r=>!b.start||(r.date>=b.start&&r.date<=b.end)).sort((a,b)=>b.date.localeCompare(a.date)||b.createdAt-a.createdAt);}
@@ -99,5 +108,5 @@ $('export-backup').addEventListener('click',async()=>{if(!storageReady||!storage
 $('import-backup').addEventListener('change',async e=>{const file=e.target.files[0];if(!file)return;try{if(file.size>10000000)throw new Error('This file is too large. Choose a Pocket JSON backup under 10 MB.');const data=JSON.parse(await file.text());if(data.app!=='pocket'||data.version!==1||!Array.isArray(data.purchases)||!data.purchases.every(validRecord)||new Set(data.purchases.map(r=>r.id)).size!==data.purchases.length)throw new Error('Choose a valid Pocket backup file.');const existing=new Set(records.map(r=>r.id));const added=data.purchases.filter(r=>!existing.has(r.id));if(!await persist([...records,...added]))throw new Error('The backup could not be saved.');render();$('backup-dialog').close();notify(`${added.length} purchase${added.length===1?'':'s'} restored.`);}catch(err){$('backup-error').textContent=err instanceof SyntaxError?'This file is not a valid JSON backup.':err.message;}e.target.value='';});
 window.addEventListener('storage',e=>{if(purchaseStorage||e.key!==STORAGE_KEY)return;try{const data=e.newValue?JSON.parse(e.newValue):[];if(!validRecords(data))throw new Error();records=data;storageHealthy=true;render();}catch{storageHealthy=false;notify('Stored records changed unexpectedly. Reload to recover your data.');}});
 render();
-const purchasesReady = purchaseStorage ? purchaseStorage.load(validRecords).then(data=>{records=data;storageReady=true;render();}).catch(()=>{storageHealthy=false;storageReady=true;notify('Purchases could not be loaded. Saving is disabled to protect existing data.');}) : Promise.resolve();
+const purchasesReady = purchaseStorage ? purchaseStorage.load(validRecords).then(data=>{records=data;storageReady=true;render();if(refreshPending){refreshPending=false;void refreshNativePurchases();}}).catch(()=>{storageHealthy=false;storageReady=true;notify('Purchases could not be loaded. Saving is disabled to protect existing data.');}) : Promise.resolve();
 if(!storageHealthy)notify('Storage could not be read. Saving is disabled to protect existing data.');

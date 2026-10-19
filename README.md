@@ -29,7 +29,17 @@ The APK starts with its own empty storage. To move existing browser purchases, d
 
 ## Android notification listener foundation
 
-The APK includes a `PocketNotificationListener` service and a local `NotificationAccess` Capacitor plugin. The service is disabled by default. This is infrastructure only: notifications are not parsed, logged, retained, forwarded, or converted into purchases, and no interface controls have been added yet.
+The APK includes a `PocketNotificationListener` service and a local `NotificationAccess` Capacitor plugin. The service component is enabled by default, but Android requires the user to grant notification access before it can connect. Pocket's Android-only Wallet notifications panel shows connection status, opens Android's notification-access settings, and allows the listener to be turned off. It parses new notifications from Google Wallet (`com.google.android.apps.walletnfcrel`) and Google Play services (`com.google.android.gms`, which can post Google payment alerts), skipping group summaries and all other source apps. Google Play services also posts non-payment alerts; parser results from it can therefore be ignored or need review. No notification history is replayed when connecting.
+
+The most recent result is held in process memory for a preview, available through `getLastResult()` as `{ result }`, and emitted as `notificationParsed` while the interface is available. Each live result includes `parsedAt`, `importStatus`, `category`, and `purchaseId`. `listenerStatusChanged` prompts the interface to recheck access and connection state. The preview is cleared when the listener is turned off and disappears when the Android process ends. Raw notification text is not logged or retained. Background notifications are processed while the interface is closed, subject to Android keeping the authorized service connected.
+
+Completed, unambiguous EUR purchase notifications now create purchases directly in SQLite on a background worker. The merchant becomes the purchase note; the notification's `when` timestamp supplies the local date and creation time, falling back to the notification post time if `when` is absent. Foreign currencies, incomplete amounts/merchants, pending transactions, declines, and refunds are not automatically recorded. Google Play services alerts additionally require payment/card wording before import because that app posts other kinds of notifications.
+
+`MerchantCategory` applies conservative local merchant-name rules across the existing categories. Examples: `GASTROBARAS +++` and cafes/restaurants → Eating Out; known grocery stores such as Lidl, Maxima, and Rimi → Food; explicit fuel/car-service names → Car; IKEA/home-supply names → House; wine/liquor shops → Drinks; recognized utilities → Bills; Paysera → Paysera. Unknown names and matches spanning multiple categories become Uncategorized. These are merchant-level rules, not item-level knowledge; categories can still be edited normally.
+
+SQLite schema version 2 adds a notification-import receipt table without changing existing purchases. The receipt and purchase are committed atomically. A hash of Android's notification key plus its event timestamp produces a stable purchase ID, protecting against repeated delivery after process restarts, preserving manual edits, and keeping deleted records deleted. Separate notification keys or event times remain separate, even if the merchant and amount match. Notifications that change both identity/time, or separate alerts from different source apps, cannot reliably be recognized as the same bank transaction from text alone; no fuzzy amount/time matching is used. JSON backups preserve stable automatic purchase IDs, so restoring an existing automatic record also prevents that exact alert from duplicating it. Deleted-record receipt history is local and is not included in purchase-only JSON backups. Failed writes do not commit a receipt, allowing a repeated alert to retry; the latest preview reports save failures.
+
+The `purchasesChanged` event refreshes the open interface after a successful import. Purchases also reload when Pocket resumes. Native saves apply per-record changes rather than replacing the whole database, and refresh responses cannot overwrite newer manual saves. No persistent diagnostic logging is added.
 
 Android JavaScript can use the bridge as follows:
 
@@ -43,7 +53,24 @@ const updatedStatus = await access.getStatus();
 await access.setEnabled({ enabled: false });
 ```
 
-Enable the component before opening settings so Android can list it. Component enablement persists across restarts and is separate from Android's notification-access grant. Disabling removes the component from service discovery; Android may require notification access to be granted again after re-enabling it. `connected` reflects the service's asynchronous connection callbacks, so it may remain false briefly after permission is granted. The bridge is `null` on other native platforms and is absent in the browser. Android 11 and later use the listener-specific settings screen where available, with a fallback to the general notification-access list. Notification access is never granted programmatically.
+Enable the component before opening settings if it was previously turned off, so Android can list it. Component enablement persists across restarts and is separate from Android's notification-access grant. Disabling removes the component from service discovery; Android may require notification access to be granted again after re-enabling it. `connected` reflects the service's asynchronous connection callbacks, so it may remain false briefly after permission is granted. The bridge is `null` on other native platforms and is absent in the browser. Android 11 and later use the listener-specific settings screen where available, with a fallback to the general notification-access list. Notification access is never granted programmatically.
+
+### Notification text parsing
+
+`PurchaseNotificationParser` is a pure Java parser. `NotificationAccess.parseNotification` accepts optional string fields `title`, `text`, `bigText`, and `subText` without reading device notifications or requiring notification access:
+
+```javascript
+await window.pocketNative.notificationAccess.parseNotification({
+  title: 'GASTROBARAS +++',
+  text: '€3.50 with SEB Debit Mastercard',
+});
+// { status: 'parsed', reason: null, cents: 350,
+//   currency: 'EUR', merchant: 'GASTROBARAS +++' }
+```
+
+The parser supports the supplied Wallet merchant-title/card-body format, split merchant/amount fields, and English “paid/spent … at …” messages. Amounts use exact integer cents, decimal dots or commas, and validated thousands separators. It removes bidirectional formatting characters and normalizes nonbreaking spaces. It does not infer currency from the card, language, or phone settings. Bare dollar signs, ambiguous separators, multiple amounts, pending transactions, and missing details return `needs_review` with a reason; recognized decline, refund, reversal, and verification messages return `ignored`. Only supported explicit currencies with two decimal minor units can produce `parsed`; non-EUR results are identified but never converted or saved. These statuses describe text interpretation, not verified bank transactions. Calling `parseNotification` manually only previews text and never creates a purchase; automatic creation runs exclusively through the live listener.
+
+Run parser tests with `./gradlew.bat :app:testDebugUnitTest --tests com.pocket.financetracker.PurchaseNotificationParserTest` from the `android` directory, with the same Java/SDK setup as APK builds.
 
 ## Run
 

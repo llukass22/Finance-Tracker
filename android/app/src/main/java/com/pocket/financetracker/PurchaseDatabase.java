@@ -22,15 +22,46 @@ public final class PurchaseDatabase extends SQLiteOpenHelper {
         "Car", "House", "Paysera", "Eating Out", "Food", "Drinks", "Bills", "Uncategorized"));
 
     public PurchaseDatabase(Context context) { this(context, "pocket-purchases.db"); }
-    PurchaseDatabase(Context context, String name) { super(context, name, null, 1); }
+    PurchaseDatabase(Context context, String name) { super(context, name, null, 2); }
 
     @Override public void onCreate(SQLiteDatabase db) {
         db.execSQL("CREATE TABLE purchases (id TEXT PRIMARY KEY NOT NULL, cents INTEGER NOT NULL CHECK(cents > 0 AND cents <= 99999999999), category TEXT NOT NULL, note TEXT NOT NULL, date TEXT NOT NULL, createdAt INTEGER NOT NULL CHECK(createdAt >= 0))");
         db.execSQL("CREATE TABLE metadata (key TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL)");
+        createImportReceipts(db);
     }
 
     @Override public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
-        throw new IllegalStateException("Unsupported purchase database version");
+        if (oldVersion == 1 && newVersion == 2) createImportReceipts(db);
+        else throw new IllegalStateException("Unsupported purchase database version");
+    }
+
+    private static void createImportReceipts(SQLiteDatabase db) {
+        // Keep receipts after deletion so a repeated notification cannot recreate an expense.
+        // Only hashed identities are retained, never the raw notification text or key.
+        db.execSQL("CREATE TABLE notification_imports (purchase_id TEXT PRIMARY KEY NOT NULL)");
+    }
+
+    public synchronized String importNotification(NotificationPurchase purchase) throws JSONException {
+        if (purchase == null) throw new IllegalArgumentException("Purchase is required");
+        ContentValues record = values(new JSONObject().put("id", purchase.id).put("cents", purchase.cents)
+            .put("category", purchase.category).put("note", purchase.merchant).put("date", purchase.date).put("createdAt", purchase.createdAt));
+        SQLiteDatabase db = getWritableDatabase();
+        db.beginTransaction();
+        try {
+            try (Cursor cursor = db.query("notification_imports", new String[]{"purchase_id"}, "purchase_id = ?",
+                    new String[]{purchase.id}, null, null, null)) {
+                if (cursor.moveToFirst()) { db.setTransactionSuccessful(); return "duplicate"; }
+            }
+            boolean exists;
+            try (Cursor cursor = db.query("purchases", new String[]{"id"}, "id = ?", new String[]{purchase.id}, null, null, null)) {
+                exists = cursor.moveToFirst();
+            }
+            if (!exists) db.insertOrThrow("purchases", null, record);
+            ContentValues receipt = new ContentValues(); receipt.put("purchase_id", purchase.id);
+            db.insertOrThrow("notification_imports", null, receipt);
+            db.setTransactionSuccessful();
+            return exists ? "duplicate" : "saved";
+        } finally { db.endTransaction(); }
     }
 
     private boolean migrated(SQLiteDatabase db, String source) {

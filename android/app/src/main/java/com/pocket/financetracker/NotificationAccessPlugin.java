@@ -13,17 +13,78 @@ import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
+import org.json.JSONObject;
+import java.lang.ref.WeakReference;
 
 @CapacitorPlugin(name = "NotificationAccess")
 public class NotificationAccessPlugin extends Plugin {
+    private static volatile WeakReference<NotificationAccessPlugin> active = new WeakReference<>(null);
+    private static volatile JSObject lastResult;
+
+    @Override public void load() { active = new WeakReference<>(this); }
+
+    @Override protected void handleOnDestroy() {
+        if (active.get() == this) active.clear();
+    }
+
+    private static JSObject resultObject(PurchaseNotificationParser.Result parsed) {
+        JSObject result = new JSObject();
+        result.put("status", parsed.status);
+        result.put("reason", parsed.reason == null ? JSONObject.NULL : parsed.reason);
+        result.put("cents", parsed.cents == null ? JSONObject.NULL : parsed.cents);
+        result.put("currency", parsed.currency == null ? JSONObject.NULL : parsed.currency);
+        result.put("merchant", parsed.merchant == null ? JSONObject.NULL : parsed.merchant);
+        return result;
+    }
+
+    static void parsed(PurchaseNotificationParser.Result parsed, String outcome, NotificationPurchase purchase) {
+        JSObject result = resultObject(parsed);
+        result.put("parsedAt", System.currentTimeMillis());
+        result.put("importStatus", outcome);
+        result.put("category", purchase == null ? JSONObject.NULL : purchase.category);
+        result.put("purchaseId", purchase == null ? JSONObject.NULL : purchase.id);
+        lastResult = result; // One transient preview; never persisted or logged.
+        NotificationAccessPlugin plugin = active.get();
+        if (plugin != null) {
+            plugin.notifyListeners("notificationParsed", result);
+            if ("saved".equals(outcome)) plugin.notifyListeners("purchasesChanged", new JSObject());
+        }
+    }
+
+    static void connectionChanged() {
+        NotificationAccessPlugin plugin = active.get();
+        if (plugin != null) plugin.notifyListeners("listenerStatusChanged", new JSObject());
+    }
+
+    @PluginMethod public void getLastResult(PluginCall call) {
+        JSObject result = new JSObject();
+        JSObject snapshot = lastResult;
+        result.put("result", snapshot == null ? JSONObject.NULL : snapshot);
+        call.resolve(result);
+    }
+
+    /** Parse supplied text only. This does not read notifications or save purchases. */
+    @PluginMethod public void parseNotification(PluginCall call) {
+        for (String key : new String[]{"title", "text", "bigText", "subText"}) {
+            Object value = call.getData().opt(key);
+            if (value != null && value != JSONObject.NULL && !(value instanceof String)) {
+                call.reject(key + " must be a string");
+                return;
+            }
+        }
+        PurchaseNotificationParser.Result parsed = PurchaseNotificationParser.parse(
+            call.getString("title"), call.getString("text"), call.getString("bigText"), call.getString("subText"));
+        call.resolve(resultObject(parsed));
+    }
+
     private ComponentName component() {
         return new ComponentName(getContext(), PocketNotificationListener.class);
     }
 
     private boolean enabled() {
-        // The manifest default is disabled. Explicit component state survives app restarts.
-        return getContext().getPackageManager().getComponentEnabledSetting(component())
-            == PackageManager.COMPONENT_ENABLED_STATE_ENABLED;
+        // The manifest default is enabled. Explicit disablement survives app restarts.
+        int state = getContext().getPackageManager().getComponentEnabledSetting(component());
+        return state == PackageManager.COMPONENT_ENABLED_STATE_ENABLED || state == PackageManager.COMPONENT_ENABLED_STATE_DEFAULT;
     }
 
     private boolean accessGranted() {
@@ -66,6 +127,7 @@ public class NotificationAccessPlugin extends Plugin {
                 ? PackageManager.COMPONENT_ENABLED_STATE_ENABLED
                 : PackageManager.COMPONENT_ENABLED_STATE_DISABLED, PackageManager.DONT_KILL_APP);
             if (enabled && accessGranted()) NotificationListenerService.requestRebind(component());
+            if (!enabled) lastResult = null;
             call.resolve(status());
         } catch (Exception error) { call.reject("Could not change notification listener state", error); }
     }

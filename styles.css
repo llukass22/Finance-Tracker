@@ -124,3 +124,7 @@ input, select, .primary-button, .secondary-button { min-height: 48px; }
 
 .category-icon svg { width: 24px; height: 24px; }
 .category-picker button svg { width: 22px; height: 22px; }
+
+.notification-panel { margin-top: 24px; }
+.notification-actions { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.notification-panel p { line-height: 1.6; }

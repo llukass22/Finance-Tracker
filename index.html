@@ -18,6 +18,13 @@
 <section class="categories-card" aria-labelledby="categories-title"><div class="card-heading"><div><h2 id="categories-title">Categories</h2></div></div><div id="category-list"></div><p class="category-hint">Tap a category to add a purchase <span>↗</span></p></section></div>
 </section>
 <section id="history" role="tabpanel" aria-labelledby="history-tab" hidden><div class="history-card"><div class="card-heading"><div><h2>Purchase history</h2></div><button id="export-csv" class="text-button">Export CSV ↗</button></div><div class="history-filters"><select id="category-filter" aria-label="Filter by category"><option value="all">All categories</option></select></div><div id="history-list"></div></div></section>
+<section id="notification-panel" class="history-card notification-panel" aria-labelledby="notification-heading" hidden>
+<h2 id="notification-heading">Wallet notifications</h2>
+<p id="notification-status" role="status">Checking notification access…</p>
+<p class="small muted">Automatically save EUR purchases from Wallet notifications. Unclear merchants go to Uncategorized.</p>
+<div class="notification-actions"><button type="button" id="notification-toggle" class="secondary-button" disabled>Enable notification access</button><button type="button" id="notification-settings" class="text-button" disabled>Android settings ↗</button></div>
+<p id="notification-preview" class="small muted" aria-live="polite">No notification processed in this session.</p>
+</section>
 <p class="privacy-note"><span>♡</span> A little more mindful. A little more in control.</p>
 </main>
 </div>

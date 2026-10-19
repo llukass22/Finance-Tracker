@@ -225,3 +225,28 @@ test('native write errors preserve records and concurrent writes do not overwrit
   assert.equal(a.run('records[0].cents'), 1000);
   assert.match(a.node('form-error').textContent, /could not be saved/);
 });
+
+test('background purchases refresh on native changes without writing back a stale list', async () => {
+  const imported = { id: 'wallet-import', cents: 350, category: 'Eating Out', note: 'GASTROBARAS +++', date: '2026-10-19', createdAt: 1 };
+  const a = app(null, false, null, { load: async () => [], reload: async () => [imported] });
+  await a.run('purchasesReady');
+  for (const refresh of a.windowHandlers['pocket-purchases-changed']) await refresh();
+  assert.equal(a.run('records.length'), 1);
+  assert.equal(a.run('records[0].note'), 'GASTROBARAS +++');
+  assert.equal(a.storage.has('pocket.purchases.v1'), false);
+});
+
+test('an older refresh cannot overwrite a newer manual save', async () => {
+  let finishRefresh;
+  const a = app(null, false, null, {
+    load: async () => [],
+    reload: () => new Promise(resolve => { finishRefresh = resolve; }),
+    save: async (previous, next) => next,
+  });
+  await a.run('purchasesReady');
+  const refresh = a.run('refreshNativePurchases()');
+  await a.submit('12.50');
+  finishRefresh([]); await refresh;
+  assert.equal(a.run('records.length'), 1);
+  assert.equal(a.run('records[0].cents'), 1250);
+});
