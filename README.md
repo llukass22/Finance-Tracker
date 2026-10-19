@@ -27,6 +27,24 @@ CSV exports and JSON backups use Android's share sheet. Choose an app that can s
 
 The APK starts with its own empty storage. To move existing browser purchases, download a JSON backup in the browser, then restore it inside the Android app. Uninstalling the app or clearing its storage removes its records. Export backups regularly. Install future APKs as updates using the same package ID and signing key; the debug build uses this computer's Android debug key. For long-term use, keep that key or use a dedicated release signing key.
 
+## Android notification listener foundation
+
+The APK includes a `PocketNotificationListener` service and a local `NotificationAccess` Capacitor plugin. The service is disabled by default. This is infrastructure only: notifications are not parsed, logged, retained, forwarded, or converted into purchases, and no interface controls have been added yet.
+
+Android JavaScript can use the bridge as follows:
+
+```javascript
+const access = window.pocketNative.notificationAccess;
+const status = await access.getStatus(); // { enabled, accessGranted, connected }
+await access.setEnabled({ enabled: true });
+await access.openSettings(); // The user grants access in Android Settings.
+// Check again after returning to Pocket; opening settings does not grant access.
+const updatedStatus = await access.getStatus();
+await access.setEnabled({ enabled: false });
+```
+
+Enable the component before opening settings so Android can list it. Component enablement persists across restarts and is separate from Android's notification-access grant. Disabling removes the component from service discovery; Android may require notification access to be granted again after re-enabling it. `connected` reflects the service's asynchronous connection callbacks, so it may remain false briefly after permission is granted. The bridge is `null` on other native platforms and is absent in the browser. Android 11 and later use the listener-specific settings screen where available, with a fallback to the general notification-access list. Notification access is never granted programmatically.
+
 ## Run
 
 ### Live reload on your Pixel over USB

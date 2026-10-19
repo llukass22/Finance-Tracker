@@ -6,6 +6,9 @@ import { Share } from '@capacitor/share';
 
 if (Capacitor.isNativePlatform()) {
   window.pocketNative = {
+    notificationAccess: Capacitor.getPlatform() === 'android'
+      ? registerPlugin('NotificationAccess')
+      : null,
     purchases: Capacitor.getPlatform() === 'android'
       ? createPurchaseStorage(registerPlugin('PurchaseStorage'), localStorage, `localStorage.v1:${window.location.origin}`)
       : null,

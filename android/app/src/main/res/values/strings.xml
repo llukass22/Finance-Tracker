@@ -1,6 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
     <string name="app_name">Pocket</string>
+    <string name="notification_listener_name">Pocket notification access</string>
     <string name="title_activity_main">Pocket</string>
     <string name="package_name">com.pocket.financetracker</string>
     <string name="custom_url_scheme">com.pocket.financetracker</string>
