@@ -17,3 +17,10 @@ coverage/
 *.tmp
 .DS_Store
 Thumbs.db
+
+# Android machine settings and signing keys
+android/local.properties
+*.jks
+*.keystore
+.tools/
+android/.idea/

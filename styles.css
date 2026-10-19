@@ -59,7 +59,7 @@ input, select, .primary-button, .secondary-button { min-height: 48px; }
 .chart-wrap { max-width: 100%; }
 
 @media (max-width: 799px) {
-  .app-shell { padding: 0 16px; }
+  .app-shell { padding: env(safe-area-inset-top, 0px) 16px 0; margin-top: -4px; }
   .topbar {
     display: grid; grid-template-columns: 1fr auto auto;
     height: auto; min-height: 100px; gap: 0 8px; padding: 12px 0;
@@ -119,3 +119,8 @@ input, select, .primary-button, .secondary-button { min-height: 48px; }
   background-position: right 16px center;
   background-size: 14px 14px;
 }
+
+.desktop-add { margin: 24px 0 16px; }
+
+.category-icon svg { width: 24px; height: 24px; }
+.category-picker button svg { width: 22px; height: 22px; }

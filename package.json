@@ -1,5 +1,27 @@
 {
-  "name": "pocket-finance", "version": "1.0.0", "private": true,
+  "name": "pocket-finance",
+  "version": "1.0.0",
+  "private": true,
   "description": "A mobile-first local EUR spending tracker",
-  "scripts": { "start": "node server.mjs", "check": "node --check app.js && node --check server.mjs", "test": "node --test tests/app.test.mjs" }
+  "scripts": {
+    "start": "node server.mjs",
+    "check": "node --check app.js && node --check server.mjs && node --check native.js && node --check scripts/build.mjs && node --check scripts/android-build.mjs && node --check scripts/android-live.mjs && node --check scripts/live-server.mjs",
+    "test": "node --test tests/*.test.mjs",
+    "build": "node scripts/build.mjs",
+    "android:sync": "npm run build && cap sync android",
+    "android:open": "cap open android",
+    "android:live": "node scripts/android-live.mjs",
+    "android:apk": "npm run android:sync && node scripts/android-build.mjs"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.5.3",
+    "@capacitor/app": "^8.1.2",
+    "@capacitor/core": "^8.5.3",
+    "@capacitor/filesystem": "^8.1.4",
+    "@capacitor/share": "^8.0.3"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.5.3",
+    "esbuild": "^0.28.2"
+  }
 }
