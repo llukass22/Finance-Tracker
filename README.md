@@ -41,6 +41,14 @@ SQLite schema version 2 adds a notification-import receipt table without changin
 
 The `purchasesChanged` event refreshes the open interface after a successful import. Purchases also reload when Pocket resumes. Native saves apply per-record changes rather than replacing the whole database, and refresh responses cannot overwrite newer manual saves. No persistent diagnostic logging is added.
 
+### Purchase confirmation notifications
+
+After an automatic purchase is successfully committed, Pocket can show a local “Purchase recorded” notification with the merchant, EUR amount, and category. Tapping it opens Pocket. Each purchase has its own notification tag, and duplicates, failed saves, skipped alerts, and manual purchases do not produce confirmations. Confirmation delivery runs independently of the interface and does not require a server. If notifications are blocked or delivery fails, the purchase stays saved.
+
+Use **Enable purchase notifications** in the Wallet notifications panel. Android 13 and later show the separate `POST_NOTIFICATIONS` permission prompt; notification-reading access does not grant permission to send alerts. The **Notification settings** link opens Android's outgoing-notification controls so app notifications or the **Automatic purchases** channel can be enabled or disabled. The panel checks both the runtime permission and the app/channel settings and refreshes after returning from Android Settings. Notification sound is controlled by Android and Do Not Disturb. Purchase details use private lock-screen visibility.
+
+The `NotificationAccess` bridge exposes `getPurchaseNotificationStatus()` → `{ permissionGranted, enabled }`, `requestPurchaseNotifications()` → the same status after the system prompt, and `openPurchaseNotificationSettings()`. Only the user's foreground action requests permission; background saves never open a permission prompt. Notifications are not replayed for purchases saved before sending permission was granted.
+
 Android JavaScript can use the bridge as follows:
 
 ```javascript

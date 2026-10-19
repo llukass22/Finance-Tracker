@@ -69,6 +69,7 @@ public class PocketNotificationListener extends NotificationListenerService {
                 // No success receipt is committed on failure; a repeated alert can retry.
                 outcome = "save_failed";
             }
+            PurchaseNotifier.showForOutcome(this, outcome, purchase);
             NotificationAccessPlugin.parsed(parsed, outcome, purchase);
         });
     }

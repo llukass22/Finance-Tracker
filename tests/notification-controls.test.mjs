@@ -4,7 +4,7 @@ import { setupNotificationControls } from '../notification-controls.mjs';
 
 async function controls(initial = { enabled: true, accessGranted: false, connected: false }) {
   const nodes = new Map(), events = {}, calls = [];
-  let status = initial, result = null;
+  let status = initial, result = null, sending = { permissionGranted: false, enabled: false };
   const document = { getElementById(id) {
     if (!nodes.has(id)) nodes.set(id, { hidden: true, textContent: '', disabled: false, handlers: {}, addEventListener(event, fn) { this.handlers[event] = fn; } });
     return nodes.get(id);
@@ -12,13 +12,16 @@ async function controls(initial = { enabled: true, accessGranted: false, connect
   const access = {
     getStatus: async () => status,
     getLastResult: async () => ({ result }),
+    getPurchaseNotificationStatus: async () => sending,
+    requestPurchaseNotifications: async () => { calls.push('request-sending'); return sending; },
+    openPurchaseNotificationSettings: async () => { calls.push('sending-settings'); },
     setEnabled: async ({ enabled }) => { calls.push(enabled); status = { ...status, enabled }; if (!enabled) result = null; },
     openSettings: async () => { calls.push('settings'); },
     addListener: async (event, fn) => { events[event] = fn; },
   };
   await setupNotificationControls(access, { addListener: async (event, fn) => { events[event] = fn; } }, document);
   return { node: id => document.getElementById(id), events, calls, access,
-    status: value => { status = value; }, result: value => { result = value; } };
+    status: value => { status = value; }, result: value => { result = value; }, sending: value => { sending = value; } };
 }
 
 test('enabling opens Android settings without assuming that access was granted', async () => {
@@ -49,4 +52,24 @@ test('settings failures leave controls available for retry', async () => {
   await c.node('notification-settings').handlers.click();
   assert.match(c.node('notification-status').textContent, /Could not change/);
   assert.equal(c.node('notification-toggle').disabled, false);
+});
+
+test('sending permission is requested separately and a denial does not disable recording', async () => {
+  const c = await controls({ enabled: true, accessGranted: true, connected: true });
+  await c.node('purchase-notification-enable').handlers.click();
+  assert.deepEqual(c.calls, ['request-sending']);
+  assert.match(c.node('purchase-notification-status').textContent, /off/);
+  assert.match(c.node('notification-status').textContent, /Listening/);
+  c.sending({ permissionGranted: true, enabled: true });
+  await c.events.resume();
+  assert.match(c.node('purchase-notification-status').textContent, /are on/);
+  assert.equal(c.node('purchase-notification-enable').hidden, true);
+});
+
+test('blocked channels lead to notification settings rather than another permission prompt', async () => {
+  const c = await controls();
+  c.sending({ permissionGranted: true, enabled: false });
+  await c.events.resume();
+  await c.node('purchase-notification-enable').handlers.click();
+  assert.deepEqual(c.calls, ['sending-settings']);
 });

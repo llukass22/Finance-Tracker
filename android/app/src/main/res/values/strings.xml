@@ -2,6 +2,10 @@
 <resources>
     <string name="app_name">Pocket</string>
     <string name="notification_listener_name">Pocket notification access</string>
+    <string name="purchase_notification_channel">Automatic purchases</string>
+    <string name="purchase_notification_channel_description">Confirmation when a Wallet purchase is saved in Pocket</string>
+    <string name="purchase_notification_title">Purchase recorded</string>
+    <string name="purchase_notification_category">Category: %1$s</string>
     <string name="title_activity_main">Pocket</string>
     <string name="package_name">com.pocket.financetracker</string>
     <string name="custom_url_scheme">com.pocket.financetracker</string>

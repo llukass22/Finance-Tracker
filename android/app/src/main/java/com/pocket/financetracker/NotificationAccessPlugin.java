@@ -1,6 +1,8 @@
 package com.pocket.financetracker;
 
 import android.app.NotificationManager;
+import android.Manifest;
+import android.net.Uri;
 import android.content.ActivityNotFoundException;
 import android.content.ComponentName;
 import android.content.Intent;
@@ -13,15 +15,61 @@ import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
+import com.getcapacitor.annotation.Permission;
+import com.getcapacitor.annotation.PermissionCallback;
+import com.getcapacitor.PermissionState;
 import org.json.JSONObject;
 import java.lang.ref.WeakReference;
 
-@CapacitorPlugin(name = "NotificationAccess")
+@CapacitorPlugin(name = "NotificationAccess", permissions = {
+    @Permission(alias = "purchaseNotifications", strings = { Manifest.permission.POST_NOTIFICATIONS })
+})
 public class NotificationAccessPlugin extends Plugin {
     private static volatile WeakReference<NotificationAccessPlugin> active = new WeakReference<>(null);
     private static volatile JSObject lastResult;
 
-    @Override public void load() { active = new WeakReference<>(this); }
+    @Override public void load() {
+        active = new WeakReference<>(this);
+        PurchaseNotifier.createChannel(getContext());
+    }
+
+    private JSObject purchaseNotificationStatus() {
+        JSObject status = new JSObject();
+        status.put("permissionGranted", PurchaseNotifier.permissionGranted(getContext()));
+        status.put("enabled", PurchaseNotifier.enabled(getContext()));
+        return status;
+    }
+
+    @PluginMethod public void getPurchaseNotificationStatus(PluginCall call) {
+        call.resolve(purchaseNotificationStatus());
+    }
+
+    @PluginMethod public void requestPurchaseNotifications(PluginCall call) {
+        if (getActivity() == null) { call.reject("Notification permission requires an active app screen"); return; }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+                && getPermissionState("purchaseNotifications") != PermissionState.GRANTED) {
+            requestPermissionForAlias("purchaseNotifications", call, "purchaseNotificationPermissionResult");
+        } else {
+            call.resolve(purchaseNotificationStatus());
+        }
+    }
+
+    @PermissionCallback private void purchaseNotificationPermissionResult(PluginCall call) {
+        call.resolve(purchaseNotificationStatus());
+    }
+
+    @PluginMethod public void openPurchaseNotificationSettings(PluginCall call) {
+        if (getActivity() == null) { call.reject("Notification settings require an active app screen"); return; }
+        getActivity().runOnUiThread(() -> {
+            try {
+                Intent intent = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
+                    ? new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, getContext().getPackageName())
+                    : new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + getContext().getPackageName()));
+                getActivity().startActivity(intent);
+                call.resolve();
+            } catch (Exception error) { call.reject("Could not open purchase notification settings", error); }
+        });
+    }
 
     @Override protected void handleOnDestroy() {
         if (active.get() == this) active.clear();
