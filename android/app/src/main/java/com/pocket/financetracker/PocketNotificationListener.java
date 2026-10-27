@@ -64,7 +64,10 @@ public class PocketNotificationListener extends NotificationListenerService {
                 ? NotificationPurchase.from(parsed, key, eventTime) : null;
             String outcome = "parsed".equals(parsed.status) && !"EUR".equals(parsed.currency) ? "unsupported_currency" : "not_imported";
             try {
-                if (purchase != null) outcome = database.importNotification(purchase);
+                if (purchase != null) {
+                    outcome = database.importNotification(purchase);
+                    purchase = purchase.withCategory(database.categoryForMerchant(purchase.merchant));
+                }
             } catch (Exception failure) {
                 // No success receipt is committed on failure; a repeated alert can retry.
                 outcome = "save_failed";

@@ -41,7 +41,7 @@ public class PurchaseStoragePlugin extends Plugin {
         try {
             JSONArray upserts = call.getArray("upserts"), deleted = call.getArray("deletedIds");
             if (upserts == null || deleted == null) throw new IllegalArgumentException("Changes are required");
-            resolve(call, database.applyChanges(upserts, deleted));
+            resolve(call, database.applyChanges(upserts, deleted, call.getString("rememberPurchaseId")));
         } catch (Exception error) { call.reject("Could not save purchases", error); }
     }
 

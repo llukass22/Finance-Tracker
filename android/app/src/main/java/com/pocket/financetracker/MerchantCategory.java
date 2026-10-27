@@ -18,10 +18,14 @@ public final class MerchantCategory {
         {"Paysera", "paysera"},
     };
 
+    public static String key(String merchant) {
+        if (merchant == null) return "";
+        return Normalizer.normalize(merchant, Normalizer.Form.NFD).replaceAll("\\p{M}+", "")
+            .toLowerCase(Locale.ROOT).replaceAll("[^\\p{L}\\p{N}]+", " ").trim();
+    }
+
     public static String categorize(String merchant) {
-        if (merchant == null) return "Uncategorized";
-        String normalized = Normalizer.normalize(merchant, Normalizer.Form.NFD).replaceAll("\\p{M}+", "")
-            .toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]+", " ").trim();
+        String normalized = key(merchant);
         Set<String> matches = new LinkedHashSet<>();
         for (String[] rule : RULES) {
             if (Pattern.compile("(?:^| )(?:" + rule[1] + ")(?: |$)").matcher(normalized).find()) matches.add(rule[0]);

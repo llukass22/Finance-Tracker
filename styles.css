@@ -128,3 +128,5 @@ input, select, .primary-button, .secondary-button { min-height: 48px; }
 .notification-panel { margin-top: 24px; }
 .notification-actions { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
 .notification-panel p { line-height: 1.6; }
+
+.remember-category-option:not([hidden]){display:flex;align-items:flex-start;gap:10px;margin:16px 0;font-size:14px;line-height:1.5}.remember-category-option input{width:18px;min-width:18px;height:18px;margin:3px 0 0;accent-color:var(--accent,#537143)}.remember-category-option small{display:block;font-weight:400;opacity:.75;margin-top:4px}

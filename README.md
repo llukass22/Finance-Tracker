@@ -129,3 +129,13 @@ The app starts empty. Amounts are stored as integer cents. Purchases stay on the
 The static app can also be served by any local HTTP server. The included server binds to all local interfaces on port 3000; set the PORT environment variable to use a different port.
 
 Run the automated functional checks with: `npm test`. These check accounting and interaction logic in a minimal DOM harness; visual browser verification was unavailable in this environment.
+
+## Remembered vendor categories (Android)
+
+Edit a notification-imported purchase and check **Remember this category for future purchases from [vendor]** before saving. The edit and vendor rule save together in the local SQLite database. Later imports check your saved rule before the built-in keyword categories. Repeating this action replaces the vendor's rule; leaving it unchecked changes only that purchase. Existing purchases are not recategorized.
+
+Matching ignores capitalization, accents, punctuation and extra spaces, but requires the complete normalized vendor name: `ABC Shop` and `ABC Shop Vilnius` are separate vendors. The original vendor is stored separately from the editable note, so changing the note does not change the match. Purchases without a known vendor do not show the checkbox.
+
+Schema version 3 preserves purchases and import receipts, adds vendor identity and a vendor-category table, and upgrades version 1 or 2 databases automatically. For older notification imports, the existing note is used as the vendor because no separate original vendor was stored. If that note was previously edited, it may not match future notifications.
+
+Rules persist across app restarts and do not depend on the WebView address. They are local to the Android installation, are not synced, and are not included in purchase-only JSON backups. Browser-only manual entry has no notification import or vendor-rule controls.

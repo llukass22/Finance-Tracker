@@ -18,12 +18,14 @@ export function createPurchaseStorage(plugin, legacyStorage, source = 'localStor
       if (!validate(state.purchases)) throw new Error('Invalid native purchases');
       return state.purchases;
     },
-    async save(previous, next, validate) {
+    async save(previous, next, validate, rememberPurchaseId = null) {
       const old = new Map(previous.map(record => [record.id, record]));
       const ids = new Set(next.map(record => record.id));
-      const upserts = next.filter(record => JSON.stringify(old.get(record.id)) !== JSON.stringify(record));
+      const upserts = next.filter(record => record.id === rememberPurchaseId || JSON.stringify(old.get(record.id)) !== JSON.stringify(record));
       const deletedIds = previous.filter(record => !ids.has(record.id)).map(record => record.id);
-      const state = await plugin.applyChanges({ upserts, deletedIds });
+      const changes = { upserts, deletedIds };
+      if (rememberPurchaseId !== null) changes.rememberPurchaseId = rememberPurchaseId;
+      const state = await plugin.applyChanges(changes);
       if (!validate(state.purchases)) throw new Error('Invalid native purchases');
       return state.purchases;
     },

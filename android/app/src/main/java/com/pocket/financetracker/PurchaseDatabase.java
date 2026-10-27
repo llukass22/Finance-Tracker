@@ -22,17 +22,36 @@ public final class PurchaseDatabase extends SQLiteOpenHelper {
         "Car", "House", "Paysera", "Eating Out", "Food", "Drinks", "Bills", "Uncategorized"));
 
     public PurchaseDatabase(Context context) { this(context, "pocket-purchases.db"); }
-    PurchaseDatabase(Context context, String name) { super(context, name, null, 2); }
+    PurchaseDatabase(Context context, String name) { super(context, name, null, 3); }
 
     @Override public void onCreate(SQLiteDatabase db) {
         db.execSQL("CREATE TABLE purchases (id TEXT PRIMARY KEY NOT NULL, cents INTEGER NOT NULL CHECK(cents > 0 AND cents <= 99999999999), category TEXT NOT NULL, note TEXT NOT NULL, date TEXT NOT NULL, createdAt INTEGER NOT NULL CHECK(createdAt >= 0))");
         db.execSQL("CREATE TABLE metadata (key TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL)");
         createImportReceipts(db);
+        createMerchantRules(db);
     }
 
     @Override public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
-        if (oldVersion == 1 && newVersion == 2) createImportReceipts(db);
-        else throw new IllegalStateException("Unsupported purchase database version");
+        if (oldVersion < 2) createImportReceipts(db);
+        if (oldVersion < 3) createMerchantRules(db);
+    }
+
+    private static void createMerchantRules(SQLiteDatabase db) {
+        db.execSQL("ALTER TABLE purchases ADD COLUMN merchant TEXT NOT NULL DEFAULT ''");
+        // Earlier imports stored the vendor only in note; this is the best available identity.
+        db.execSQL("UPDATE purchases SET merchant = note WHERE id LIKE 'wallet-%'");
+        db.execSQL("CREATE TABLE merchant_categories (merchant_key TEXT PRIMARY KEY NOT NULL, category TEXT NOT NULL)");
+    }
+
+    public synchronized String categoryForMerchant(String merchant) {
+        return categoryForMerchant(getReadableDatabase(), merchant);
+    }
+
+    private String categoryForMerchant(SQLiteDatabase db, String merchant) {
+        try (Cursor cursor = db.query("merchant_categories", new String[]{"category"}, "merchant_key = ?",
+                new String[]{MerchantCategory.key(merchant)}, null, null, null)) {
+            return cursor.moveToFirst() ? cursor.getString(0) : MerchantCategory.categorize(merchant);
+        }
     }
 
     private static void createImportReceipts(SQLiteDatabase db) {
@@ -44,7 +63,7 @@ public final class PurchaseDatabase extends SQLiteOpenHelper {
     public synchronized String importNotification(NotificationPurchase purchase) throws JSONException {
         if (purchase == null) throw new IllegalArgumentException("Purchase is required");
         ContentValues record = values(new JSONObject().put("id", purchase.id).put("cents", purchase.cents)
-            .put("category", purchase.category).put("note", purchase.merchant).put("date", purchase.date).put("createdAt", purchase.createdAt));
+            .put("category", purchase.category).put("merchant", purchase.merchant).put("note", purchase.merchant).put("date", purchase.date).put("createdAt", purchase.createdAt));
         SQLiteDatabase db = getWritableDatabase();
         db.beginTransaction();
         try {
@@ -56,6 +75,7 @@ public final class PurchaseDatabase extends SQLiteOpenHelper {
             try (Cursor cursor = db.query("purchases", new String[]{"id"}, "id = ?", new String[]{purchase.id}, null, null, null)) {
                 exists = cursor.moveToFirst();
             }
+            record.put("category", categoryForMerchant(db, purchase.merchant));
             if (!exists) db.insertOrThrow("purchases", null, record);
             ContentValues receipt = new ContentValues(); receipt.put("purchase_id", purchase.id);
             db.insertOrThrow("notification_imports", null, receipt);
@@ -72,11 +92,11 @@ public final class PurchaseDatabase extends SQLiteOpenHelper {
 
     private JSONObject state(SQLiteDatabase db, String source) throws JSONException {
         JSONArray purchases = new JSONArray();
-        try (Cursor cursor = db.query("purchases", new String[]{"id", "cents", "category", "note", "date", "createdAt"}, null, null, null, null, "createdAt, id")) {
+        try (Cursor cursor = db.query("purchases", new String[]{"id", "cents", "category", "note", "date", "createdAt", "merchant"}, null, null, null, null, "createdAt, id")) {
             while (cursor.moveToNext()) {
                 purchases.put(new JSONObject().put("id", cursor.getString(0)).put("cents", cursor.getLong(1))
                     .put("category", cursor.getString(2)).put("note", cursor.getString(3))
-                    .put("date", cursor.getString(4)).put("createdAt", cursor.getLong(5)));
+                    .put("date", cursor.getString(4)).put("createdAt", cursor.getLong(5)).put("merchant", cursor.getString(6)));
             }
         }
         return new JSONObject().put("purchases", purchases).put("migrated", migrated(db, source));
@@ -111,6 +131,7 @@ public final class PurchaseDatabase extends SQLiteOpenHelper {
         if (!CATEGORIES.contains(category)) throw new IllegalArgumentException("Invalid purchase category");
         values.put("category", category);
         values.put("note", text(record, "note", 200, true));
+        if (record.has("merchant")) values.put("merchant", text(record, "merchant", 200, true));
         String date = text(record, "date", 10, false);
         SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd", Locale.ROOT);
         format.setLenient(false);
@@ -157,6 +178,10 @@ public final class PurchaseDatabase extends SQLiteOpenHelper {
 
     /** Change only specified IDs so unrelated native writers are never erased. */
     public synchronized JSONObject applyChanges(JSONArray upserts, JSONArray deletedIds) throws JSONException {
+        return applyChanges(upserts, deletedIds, null);
+    }
+
+    public synchronized JSONObject applyChanges(JSONArray upserts, JSONArray deletedIds, String rememberPurchaseId) throws JSONException {
         ContentValues[] records = validated(upserts);
         String[] deleted = new String[deletedIds.length()];
         for (int i = 0; i < deleted.length; i++) {
@@ -170,6 +195,19 @@ public final class PurchaseDatabase extends SQLiteOpenHelper {
         db.beginTransaction();
         try {
             if (!migrated(db, "database.initialized")) throw new IllegalStateException("Purchase storage is not initialized");
+            if (rememberPurchaseId != null) {
+                ContentValues selected = null;
+                for (ContentValues record : records) {
+                    if (rememberPurchaseId.equals(record.getAsString("id"))) selected = record;
+                }
+                if (selected == null) throw new IllegalArgumentException("Remembered purchase must be included in changes");
+                String merchant = selected.getAsString("merchant");
+                String key = MerchantCategory.key(merchant);
+                if (key.isEmpty()) throw new IllegalArgumentException("A vendor is required to remember a category");
+                ContentValues rule = new ContentValues();
+                rule.put("merchant_key", key); rule.put("category", selected.getAsString("category"));
+                db.insertWithOnConflict("merchant_categories", null, rule, SQLiteDatabase.CONFLICT_REPLACE);
+            }
             for (String id : deleted) db.delete("purchases", "id = ?", new String[]{id});
             for (ContentValues record : records) {
                 if (db.update("purchases", record, "id = ?", new String[]{record.getAsString("id")}) == 0) {

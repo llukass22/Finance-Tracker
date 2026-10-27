@@ -250,3 +250,27 @@ test('an older refresh cannot overwrite a newer manual save', async () => {
   assert.equal(a.run('records.length'), 1);
   assert.equal(a.run('records[0].cents'), 1250);
 });
+
+test('vendor edits preserve identity and remember only with explicit consent', async () => {
+  const record = { id: 'wallet-test', cents: 350, category: 'Uncategorized', note: 'ABC Shop', merchant: 'ABC Shop', date: '2026-10-27', createdAt: 1 };
+  let remembered, saved;
+  const purchases = {
+    load: async () => [record],
+    save: async (previous, next, validate, rememberId) => { saved = next; remembered = rememberId; return next; },
+  };
+  const a = app(null, false, null, purchases);
+  await a.run('purchasesReady');
+  a.run('openPurchase("Food", records[0])');
+  assert.equal(a.node('remember-category-option').hidden, false);
+  assert.equal(a.node('remember-category').checked, false);
+  a.node('remember-category').checked = true;
+  await a.submit('3.50', 'Food', '2026-10-27', 'A different note');
+  assert.equal(saved[0].merchant, 'ABC Shop');
+  assert.equal(remembered, 'wallet-test');
+  a.run('openPurchase("Food", records[0])');
+  assert.equal(a.node('remember-category').checked, false);
+  await a.submit('3.50', 'House', '2026-10-27', 'Another note');
+  assert.equal(remembered, null);
+  a.run('openPurchase()');
+  assert.equal(a.node('remember-category-option').hidden, true);
+});

@@ -31,4 +31,8 @@ public final class NotificationPurchase {
             return new NotificationPurchase("wallet-" + hash, MerchantCategory.categorize(parsed.merchant), parsed.merchant, date, parsed.cents, eventTime);
         } catch (NoSuchAlgorithmException impossible) { throw new IllegalStateException(impossible); }
     }
+
+    public NotificationPurchase withCategory(String category) {
+        return new NotificationPurchase(id, category, merchant, date, cents, createdAt);
+    }
 }

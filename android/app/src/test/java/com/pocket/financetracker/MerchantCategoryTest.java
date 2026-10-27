@@ -4,6 +4,12 @@ import static org.junit.Assert.*;
 import org.junit.Test;
 
 public class MerchantCategoryTest {
+    @Test public void vendorKeysNormalizeCaseAccentsAndSpacingWithoutMergingBranches() {
+        assertEquals(MerchantCategory.key("  LOCAL Café+++ "), MerchantCategory.key("local cafe"));
+        assertNotEquals(MerchantCategory.key("ABC Shop"), MerchantCategory.key("ABC Shop Vilnius"));
+        assertNotEquals(MerchantCategory.key("Магазин"), MerchantCategory.key("Кафе"));
+        assertEquals("", MerchantCategory.key("+++"));
+    }
     @Test public void suppliedMerchantIsEatingOut() {
         assertEquals("Eating Out", MerchantCategory.categorize("GASTROBARAS +++"));
     }

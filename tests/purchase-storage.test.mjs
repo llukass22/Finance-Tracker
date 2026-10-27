@@ -65,3 +65,14 @@ test('migration identifies the WebView origin so development does not skip stand
   assert.deepEqual(await storage.load(valid), []);
   assert.deepEqual(calls, [{ source: 'localStorage.v1:https://localhost' }, { source: 'localStorage.v1:https://localhost', purchases: [] }]);
 });
+
+ test('remembered vendor category is sent even when purchase fields are unchanged', async () => {
+  const vendor = { ...record, merchant: 'ABC Shop' };
+  let request;
+  const storage = createPurchaseStorage({ applyChanges: async changes => {
+    request = changes;
+    return { purchases: [vendor] };
+  } }, {});
+  await storage.save([vendor], [vendor], valid, vendor.id);
+  assert.deepEqual(request, { upserts: [vendor], deletedIds: [], rememberPurchaseId: vendor.id });
+});

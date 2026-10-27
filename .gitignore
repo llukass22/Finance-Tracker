@@ -24,3 +24,6 @@ android/local.properties
 *.keystore
 .tools/
 android/.idea/
+
+# Kotlin compiler session cache
+android/.kotlin/
