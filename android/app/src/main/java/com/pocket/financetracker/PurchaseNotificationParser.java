@@ -19,6 +19,9 @@ public final class PurchaseNotificationParser {
     private static final Pattern NON_PURCHASE = Pattern.compile("\\b(declined|failed|cancelled|canceled|refunded?|refunds|reversed|reversal|cashback|verification|one.time (?:code|password)|OTP)\\b", Pattern.CASE_INSENSITIVE);
     private static final Pattern UNCERTAIN = Pattern.compile("\\b(pending|pre.?authori[sz](?:ation|ed)|hold|balance|available)\\b", Pattern.CASE_INSENSITIVE);
     private static final Pattern AT_MERCHANT = Pattern.compile("(?:^|\\b)(?:at|to)\\s+(.+)$", Pattern.CASE_INSENSITIVE);
+    private static final String SEB_HEADING = "Nauja operacija";
+    private static final Pattern SEB_OUTGOING = Pattern.compile("^Pervedėte\\s+(" + NUMBER + ")\\s+(" + CODE + ")\\s+(.+)$", Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
+    private static final Pattern SEB_PURPOSE = Pattern.compile("\\s+Paskirtis\\s*:.*$", Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
     private static final Pattern GENERIC = Pattern.compile("(?i)^(?:google (?:wallet|pay)|wallet|payment|purchase|transaction|notification|you (?:paid|spent)|(?:payment|purchase|transaction) (?:successful|approved|complete|completed)|paid|spent|tap\\b.*|view\\b.*|.*(?:ending (?:in )?|[•*]{2,})\\d{2,4})[.!:]?$");
 
     public static final class Result {
@@ -74,6 +77,46 @@ public final class PurchaseNotificationParser {
             || Pattern.compile("(?i)^(?:with|using|on card|card ending|you paid|you spent|paid|spent|payment|purchase|transaction)\\b").matcher(candidate).find()
             || !Pattern.compile("\\p{L}").matcher(candidate).find() || MONEY.matcher(candidate).find()) return null;
         return candidate;
+    }
+
+    /** SEB Lietuva's Lithuanian outgoing-payment format; never fall back to Wallet heuristics. */
+    public static Result parseSeb(String title, String text, String bigText, String subText) {
+        for (String field : new String[]{title, text, bigText, subText}) {
+            if (field != null && field.length() > 10000) return review("text_too_long");
+        }
+        Set<String> bodies = new LinkedHashSet<>();
+        String body = normalize(text), expanded = normalize(bigText);
+        if (!body.isEmpty() && (expanded.isEmpty() || !expanded.contains(body))) bodies.add(body);
+        if (!expanded.isEmpty()) bodies.add(expanded);
+        boolean hasHeading = SEB_HEADING.equalsIgnoreCase(normalize(title));
+        if (bodies.isEmpty()) return review("missing_text");
+        Result payment = null;
+        for (String candidate : bodies) {
+            // Also accept a complete notification supplied as one text field.
+            if (candidate.regionMatches(true, 0, SEB_HEADING + " ", 0, SEB_HEADING.length() + 1)) {
+                candidate = candidate.substring(SEB_HEADING.length()).trim();
+            } else if (!hasHeading) {
+                return review("unrecognized_seb_notification");
+            }
+            if (!candidate.regionMatches(true, 0, "Pervedėte ", 0, "Pervedėte ".length())) {
+                return new Result("ignored", "not_seb_outgoing_payment", null, null, null);
+            }
+            // Purpose/reference text is metadata, even when it mentions another amount.
+            String operation = SEB_PURPOSE.matcher(candidate).replaceFirst("");
+            Matcher outgoing = SEB_OUTGOING.matcher(operation);
+            if (!outgoing.matches()) return review("invalid_seb_payment");
+            Long value = cents(outgoing.group(1));
+            if (value == null) return review("invalid_or_ambiguous_amount");
+            String code = currency(outgoing.group(2));
+            if (Currency.getInstance(code).getDefaultFractionDigits() != 2) return review("unsupported_currency_precision");
+            String recipient = merchant(outgoing.group(3).replaceFirst("\\.$", ""));
+            if (recipient == null) return review("missing_merchant");
+            if (payment != null && (!payment.cents.equals(value) || !payment.currency.equals(code) || !payment.merchant.equals(recipient))) {
+                return review("conflicting_notification_text");
+            }
+            payment = new Result("parsed", null, value, code, recipient);
+        }
+        return payment;
     }
 
     public static Result parse(String title, String text, String bigText, String subText) {

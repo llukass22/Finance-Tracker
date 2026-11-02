@@ -29,7 +29,7 @@ The APK starts with its own empty storage. To move existing browser purchases, d
 
 ## Android notification listener foundation
 
-The APK includes a `PocketNotificationListener` service and a local `NotificationAccess` Capacitor plugin. The service component is enabled by default, but Android requires the user to grant notification access before it can connect. Pocket's Android-only Wallet notifications panel shows connection status, opens Android's notification-access settings, and allows the listener to be turned off. It parses new notifications from Google Wallet (`com.google.android.apps.walletnfcrel`) and Google Play services (`com.google.android.gms`, which can post Google payment alerts), skipping group summaries and all other source apps. Google Play services also posts non-payment alerts; parser results from it can therefore be ignored or need review. No notification history is replayed when connecting.
+The APK includes a `PocketNotificationListener` service and a local `NotificationAccess` Capacitor plugin. The service component is enabled by default, but Android requires the user to grant notification access before it can connect. Pocket's Android-only Wallet and SEB notifications panel shows connection status, opens Android's notification-access settings, and allows the listener to be turned off. It parses new notifications from Google Wallet (`com.google.android.apps.walletnfcrel`), Google Play services (`com.google.android.gms`, which can post Google payment alerts), and SEB Lietuva (`se.seb.lithuania`, verified against its [Google Play listing](https://play.google.com/store/apps/details?id=se.seb.lithuania)), skipping group summaries and all other source apps. Google Play services also posts non-payment alerts; parser results from it can therefore be ignored or need review. No notification history is replayed when connecting.
 
 The most recent result is held in process memory for a preview, available through `getLastResult()` as `{ result }`, and emitted as `notificationParsed` while the interface is available. Each live result includes `parsedAt`, `importStatus`, `category`, and `purchaseId`. `listenerStatusChanged` prompts the interface to recheck access and connection state. The preview is cleared when the listener is turned off and disappears when the Android process ends. Raw notification text is not logged or retained. Background notifications are processed while the interface is closed, subject to Android keeping the authorized service connected.
 
@@ -45,7 +45,7 @@ The `purchasesChanged` event refreshes the open interface after a successful imp
 
 After an automatic purchase is successfully committed, Pocket can show a local “Purchase recorded” notification with the merchant, EUR amount, and category. Tapping it opens Pocket. Each purchase has its own notification tag, and duplicates, failed saves, skipped alerts, and manual purchases do not produce confirmations. Confirmation delivery runs independently of the interface and does not require a server. If notifications are blocked or delivery fails, the purchase stays saved.
 
-Use **Enable purchase notifications** in the Wallet notifications panel. Android 13 and later show the separate `POST_NOTIFICATIONS` permission prompt; notification-reading access does not grant permission to send alerts. The **Notification settings** link opens Android's outgoing-notification controls so app notifications or the **Automatic purchases** channel can be enabled or disabled. The panel checks both the runtime permission and the app/channel settings and refreshes after returning from Android Settings. Notification sound is controlled by Android and Do Not Disturb. Purchase details use private lock-screen visibility.
+Use **Enable purchase notifications** in the Wallet and SEB notifications panel. Android 13 and later show the separate `POST_NOTIFICATIONS` permission prompt; notification-reading access does not grant permission to send alerts. The **Notification settings** link opens Android's outgoing-notification controls so app notifications or the **Automatic purchases** channel can be enabled or disabled. The panel checks both the runtime permission and the app/channel settings and refreshes after returning from Android Settings. Notification sound is controlled by Android and Do Not Disturb. Purchase details use private lock-screen visibility.
 
 The `NotificationAccess` bridge exposes `getPurchaseNotificationStatus()` → `{ permissionGranted, enabled }`, `requestPurchaseNotifications()` → the same status after the system prompt, and `openPurchaseNotificationSettings()`. Only the user's foreground action requests permission; background saves never open a permission prompt. Notifications are not replayed for purchases saved before sending permission was granted.
 
@@ -79,6 +79,20 @@ await window.pocketNative.notificationAccess.parseNotification({
 The parser supports the supplied Wallet merchant-title/card-body format, split merchant/amount fields, and English “paid/spent … at …” messages. Amounts use exact integer cents, decimal dots or commas, and validated thousands separators. It removes bidirectional formatting characters and normalizes nonbreaking spaces. It does not infer currency from the card, language, or phone settings. Bare dollar signs, ambiguous separators, multiple amounts, pending transactions, and missing details return `needs_review` with a reason; recognized decline, refund, reversal, and verification messages return `ignored`. Only supported explicit currencies with two decimal minor units can produce `parsed`; non-EUR results are identified but never converted or saved. These statuses describe text interpretation, not verified bank transactions. Calling `parseNotification` manually only previews text and never creates a purchase; automatic creation runs exclusively through the live listener.
 
 Run parser tests with `./gradlew.bat :app:testDebugUnitTest --tests com.pocket.financetracker.PurchaseNotificationParserTest` from the `android` directory, with the same Java/SDK setup as APK builds.
+
+### SEB Lietuva outgoing payments
+
+SEB notifications use a separate `PurchaseNotificationParser.parseSeb` path selected by the notification's source package. It requires the `Nauja operacija` heading and a body starting with `Pervedėte`. For example:
+
+```text
+Nauja operacija
+Pervedėte 18.30 EUR Lietuvos paštas AB.
+Paskirtis: PSD2 - RS0194354629
+```
+
+This creates a EUR 18.30 expense with `Lietuvos paštas AB` as the merchant/note. The final sentence period and `Paskirtis:` reference are excluded. Decimal dots and commas, validated thousands grouping, and expanded notification text are supported. Incoming payments, payment requests, and other bodies that do not start with `Pervedėte` are ignored. Missing headings, malformed payments, and conflicting short/expanded text are not imported. Only EUR payments are saved, using the existing categorization, vendor preferences, storage, and confirmation notifications. The same notification-access switch controls Wallet and SEB. There is no cross-app duplicate matching; existing protection against repeated delivery of the same notification remains unchanged. The text-only `NotificationAccess.parseNotification` preview continues to use the Wallet parser.
+
+Run the SEB tests with `./gradlew.bat :app:testDebugUnitTest --tests com.pocket.financetracker.SebNotificationParserTest` from the `android` directory.
 
 ## Run
 
