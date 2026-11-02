@@ -9,7 +9,7 @@ import android.os.Bundle;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-/** Parse new Wallet notifications and atomically save categorized EUR purchases. */
+/** Parse new Wallet and SEB notifications and atomically save categorized EUR purchases. */
 public class PocketNotificationListener extends NotificationListenerService {
     private static volatile boolean connected;
     private final ExecutorService worker = Executors.newSingleThreadExecutor();

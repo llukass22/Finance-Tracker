@@ -23,7 +23,7 @@ export async function setupNotificationControls(access, app, document) {
       alertsEnable.textContent = nextSending.permissionGranted ? 'Enable in Android settings' : 'Enable purchase notifications';
       alertsEnable.disabled = alertsSettings.disabled = alertsBusy;
       statusText.textContent = !next.enabled ? 'Off' : !next.accessGranted
-        ? 'Notification access required' : next.connected ? 'Listening for Wallet notifications' : 'Connecting to Android…';
+        ? 'Notification access required' : next.connected ? 'Listening for Wallet and SEB notifications' : 'Connecting to Android…';
       toggle.textContent = next.enabled && next.accessGranted ? 'Turn off' : 'Enable notification access';
       toggle.disabled = settings.disabled = busy;
       const parsed = next.enabled ? snapshot.result : null;
