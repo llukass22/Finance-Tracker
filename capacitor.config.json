@@ -1,5 +1,11 @@
 {
   "appId": "com.pocket.financetracker",
   "appName": "Pocket",
-  "webDir": "dist"
+  "webDir": "dist",
+  "plugins": {
+    "SystemBars": {
+      "insetsHandling": "native",
+      "initialViewportFitValueHint": "contain"
+    }
+  }
 }

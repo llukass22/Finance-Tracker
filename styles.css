@@ -59,7 +59,7 @@ input, select, .primary-button, .secondary-button { min-height: 48px; }
 .chart-wrap { max-width: 100%; }
 
 @media (max-width: 799px) {
-  .app-shell { padding: env(safe-area-inset-top, 0px) 16px 0; margin-top: -4px; }
+  .app-shell { padding: env(safe-area-inset-top, 0px) 16px 0; }
   .topbar {
     display: grid; grid-template-columns: 1fr auto auto;
     height: auto; min-height: 100px; gap: 0 8px; padding: 12px 0;
