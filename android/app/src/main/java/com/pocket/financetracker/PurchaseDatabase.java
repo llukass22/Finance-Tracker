@@ -19,7 +19,7 @@ import java.util.Set;
 /** App-private source of purchase records, independent of the WebView lifecycle. */
 public final class PurchaseDatabase extends SQLiteOpenHelper {
     private static final Set<String> CATEGORIES = new HashSet<>(Arrays.asList(
-        "Car", "House", "Paysera", "Eating Out", "Food", "Drinks", "Bills", "Uncategorized"));
+        "Car", "House", "Paysera", "Eating Out", "Food", "Drinks", "Bills", "Sports", "Etsy (shipping labels)", "Uncategorized"));
 
     public PurchaseDatabase(Context context) { this(context, "pocket-purchases.db"); }
     PurchaseDatabase(Context context, String name) { super(context, name, null, 3); }

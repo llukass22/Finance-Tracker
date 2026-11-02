@@ -9,6 +9,7 @@ export async function setupNotificationControls(access, app, document) {
   const alertsSettings = document.getElementById('purchase-notification-settings');
   let status = null, sending = null, busy = false, alertsBusy = false, revision = 0;
   panel.hidden = false;
+  document.getElementById('notification-unavailable').hidden = true;
 
   async function refresh() {
     const current = ++revision;

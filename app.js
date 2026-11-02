@@ -8,6 +8,8 @@ food:'<path d="M5 3v7m3-7v7m-6-7v7c0 3 6 3 6 0M5 13v8M16 3c-4 3-4 10 0 10h2V3Zm2
 basket:'<path d="m8 3-4 7m12-7 4 7M2 10h20l-3 11H5Zm6 4v3m4-3v3m4-3v3"/>',
 drink:'<path d="M7 4h10l-1 17H8ZM6 8h12m-5 0 2-7h4"/>',
 bills:'<path d="M5 2h14v20l-3-2-4 2-4-2-3 2Zm4 5h6m-6 4h6m-6 4h3"/>',
+sports:'<path d="m6 6 12 12M4 9l5-5m6 16 5-5M2 7l5-5m10 20 5-5"/>',
+shipping:'<path d="m3 7 9-4 9 4v10l-9 4-9-4Zm0 0 9 4 9-4M12 11v10M8 5l9 4"/>',
 uncategorized:'<circle cx="12" cy="12" r="9"/><path d="M9 9a3 3 0 0 1 6 0c0 2-3 2-3 5m0 3h.01"/>',
 edit:'<path d="m15 4 5 5M3 21l5-1L21 7a2 2 0 0 0-5-5L3 15Z"/>',
 trash:'<path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7m4-7v7"/>',
@@ -24,6 +26,8 @@ const categories = [
 {name:'Food', color:'#94c9dd', tint:'#eaf5f9', icon:'basket'},
 {name:'Drinks', color:'#b4d67d', tint:'#f1f7e6', icon:'drink'},
 {name:'Bills', color:'#eeab80', tint:'#fcf0e8', icon:'bills'},
+{name:'Sports', color:'#6eb9c2', tint:'#e8f5f6', icon:'sports'},
+{name:'Etsy (shipping labels)', color:'#e68b59', tint:'#fcf0e7', icon:'shipping'},
 {name:'Uncategorized', color:'#a0a7b4', tint:'#eef0f4', icon:'uncategorized'}
 ];
 const categoryMap = new Map(categories.map(c => [c.name,c]));
@@ -89,6 +93,7 @@ function showView(view){const overview=view==='overview';$('overview').hidden=!o
 function selectCategory(name){$('purchase-category').value=name;for(const button of $('category-picker').children){const on=button.dataset.category===name;button.classList.toggle('active',on);button.setAttribute('aria-pressed',on);}}
 function openPurchase(category='Food',record=null){editingId=record?.id||null;$('purchase-form').reset();$('form-title').textContent=record?'Edit purchase':'Add a purchase';$('amount').value=record?(record.cents/100).toFixed(2):'';$('note').value=record?.note||'';$('purchase-date').value=record?.date||localDate();$('form-error').textContent='';$('remember-category').checked=false;$('remember-category-option').hidden=!(purchaseStorage&&record?.merchant&&record.merchant.normalize('NFD').replace(/[\u0300-\u036f]/g,'').match(/[\p{L}\p{N}]/u));$('remember-vendor').textContent=record?.merchant||'';selectCategory(record?.category||category);$('purchase-dialog').showModal();setTimeout(()=>$('amount').focus(),50);}
 $('backup-button').innerHTML=icon('backup');
+$('settings-button').addEventListener('click',()=>$('settings-dialog').showModal());
 for(const c of categories){$('purchase-category').add(new Option(c.name,c.name));$('category-filter').add(new Option(c.name,c.name));}
 $('category-picker').innerHTML=categories.map(c=>`<button type="button" data-category="${c.name}" style="--color:${c.color}" aria-pressed="false">${icon(c.icon)}${c.name}</button>`).join('');
 $('category-picker').addEventListener('click',e=>{const b=e.target.closest('[data-category]');if(b)selectCategory(b.dataset.category);});

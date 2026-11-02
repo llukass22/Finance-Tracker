@@ -62,10 +62,10 @@ test('theme follows preference changes from another tab and ignores invalid pref
   for (const handler of a.windowHandlers.storage) handler({ key: null, newValue: null });
   assert.equal(a.documentElement.dataset.theme, 'light');
 });
-test('new tracker starts empty and lists all eight categories', async () => {
+test('new tracker starts empty and lists all ten categories', async () => {
   const a = app(); assert.equal(a.run('records.length'), 0);
   assert.equal(a.node('total-spent').textContent, '€0.00');
-  assert.equal((a.node('category-list').innerHTML.match(/class="category-row"/g) || []).length, 8);
+  assert.equal((a.node('category-list').innerHTML.match(/class="category-row"/g) || []).length, 10);
 });
 test('purchase entry accepts decimal comma, saves exact cents and survives reload', async () => {
   const a = app(); await a.submit('12,50'); await a.submit('0.10', 'Drinks');
