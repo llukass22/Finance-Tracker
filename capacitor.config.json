@@ -5,7 +5,8 @@
   "plugins": {
     "SystemBars": {
       "insetsHandling": "native",
-      "initialViewportFitValueHint": "contain"
+      "initialViewportFitValueHint": "contain",
+      "style": "DARK"
     }
   }
 }
