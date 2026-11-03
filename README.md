@@ -29,7 +29,16 @@ The APK starts with its own empty storage. To move existing browser purchases, d
 
 ## Android notification listener foundation
 
-The APK includes a `PocketNotificationListener` service and a local `NotificationAccess` Capacitor plugin. The service component is enabled by default, but Android requires the user to grant notification access before it can connect. Pocket's Android-only Payment notifications panel shows connection status, opens Android's notification-access settings, and allows the listener to be turned off. It parses new notifications from Google Wallet (`com.google.android.apps.walletnfcrel`), Google Play services (`com.google.android.gms`, which can post Google payment alerts), SEB Lietuva (`se.seb.lithuania`, verified against its [Google Play listing](https://play.google.com/store/apps/details?id=se.seb.lithuania)), and Swedbank Lietuva (`lt.swedbank.mobile`), skipping group summaries and all other source apps. Google Play services also posts non-payment alerts; parser results from it can therefore be ignored or need review. No notification history is replayed when connecting.
+The APK includes a `PocketNotificationListener` service and a local `NotificationAccess` Capacitor plugin. The service component is enabled by default, but Android requires the user to grant notification access before it can connect. Pocket's Android-only Payment notifications panel shows connection status, opens Android's notification-access settings, and allows the listener to be turned off. Pocket checks new notifications from the sources below and skips Android group summaries. It processes new alerts as they arrive.
+
+| Source | Import rule |
+| --- | --- |
+| Google Wallet (`com.google.android.apps.walletnfcrel`) | A purchase alert with a clear amount and merchant, such as `€3.50 with SEB Debit Mastercard` under the merchant's name. |
+| Google Play services (`com.google.android.gms`) | An alert with a clear amount and merchant plus payment or card wording, such as `You paid €3.50 at Shop`. |
+| SEB Lietuva (`se.seb.lithuania`) | `Nauja operacija` followed by `Pervedėte <amount> EUR <recipient>`. Pocket records the outgoing payment and excludes the `Paskirtis:` reference. [Google Play listing](https://play.google.com/store/apps/details?id=se.seb.lithuania) |
+| Swedbank Lietuva (`lt.swedbank.mobile`) | `<amount> EUR has been sent to <recipient>`. For example, `5 EUR has been sent to Example Recipient` records a €5.00 outgoing payment to Example Recipient. [Google Play listing](https://play.google.com/store/apps/details?id=lt.swedbank.mobile) |
+
+Automatic import requires a completed EUR payment with a clear merchant or recipient. The bank rules skip incoming transfers and unrelated alerts.
 
 The most recent result is held in process memory for a preview, available through `getLastResult()` as `{ result }`, and emitted as `notificationParsed` while the interface is available. Each live result includes `parsedAt`, `importStatus`, `category`, and `purchaseId`. `listenerStatusChanged` prompts the interface to recheck access and connection state. The preview is cleared when the listener is turned off and disappears when the Android process ends. Raw notification text is not logged or retained. Background notifications are processed while the interface is closed, subject to Android keeping the authorized service connected.
 
