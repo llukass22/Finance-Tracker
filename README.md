@@ -1,6 +1,6 @@
 # Pocket — local finance tracker
 
-A mobile-first EUR spending tracker with Car, House, Paysera, Eating Out, Food, Drinks, Bills, Sports, Etsy (shipping labels), and Uncategorized. Runs as a web app or a standalone Android APK. No account or backend is needed.
+A mobile-first EUR spending tracker with House, Investing, Paysera, Subscriptions, Car, Transport, Food, Eating Out, Drinks, Sports, Clothes, Gifts, Etsy (shipping labels), and Uncategorized. Runs as a web app or a standalone Android APK. No account or backend is needed.
 
 ## Android APK
 
@@ -35,7 +35,7 @@ The most recent result is held in process memory for a preview, available throug
 
 Completed, unambiguous EUR purchase notifications now create purchases directly in SQLite on a background worker. The merchant becomes the purchase note; the notification's `when` timestamp supplies the local date and creation time, falling back to the notification post time if `when` is absent. Foreign currencies, incomplete amounts/merchants, pending transactions, declines, and refunds are not automatically recorded. Google Play services alerts additionally require payment/card wording before import because that app posts other kinds of notifications.
 
-`MerchantCategory` applies conservative local merchant-name rules across the existing categories. Examples: `GASTROBARAS +++` and cafes/restaurants → Eating Out; known grocery stores such as Lidl, Maxima, and Rimi → Food; explicit fuel/car-service names → Car; IKEA/home-supply names → House; wine/liquor shops → Drinks; recognized utilities → Bills; Paysera → Paysera. Unknown names and matches spanning multiple categories become Uncategorized. These are merchant-level rules, not item-level knowledge; categories can still be edited normally.
+`MerchantCategory` applies conservative local merchant-name rules across the existing categories. Examples: `GASTROBARAS +++` and cafes/restaurants → Eating Out; known grocery stores such as Lidl, Maxima, and Rimi → Food; explicit fuel/car-service names → Car; IKEA/home-supply names → House; wine/liquor shops → Drinks; recognized utilities → Subscriptions; Paysera → Paysera. Unknown names and matches spanning multiple categories become Uncategorized. These are merchant-level rules, not item-level knowledge; categories can still be edited normally.
 
 SQLite schema version 2 adds a notification-import receipt table without changing existing purchases. The receipt and purchase are committed atomically. A hash of Android's notification key plus its event timestamp produces a stable purchase ID, protecting against repeated delivery after process restarts, preserving manual edits, and keeping deleted records deleted. Separate notification keys or event times remain separate, even if the merchant and amount match. Notifications that change both identity/time, or separate alerts from different source apps, cannot reliably be recognized as the same bank transaction from text alone; no fuzzy amount/time matching is used. JSON backups preserve stable automatic purchase IDs, so restoring an existing automatic record also prevents that exact alert from duplicating it. Deleted-record receipt history is local and is not included in purchase-only JSON backups. Failed writes do not commit a receipt, allowing a repeated alert to retry; the latest preview reports save failures.
 

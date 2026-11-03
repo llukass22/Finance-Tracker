@@ -10,7 +10,7 @@ function app(stored = null, failSave = false, theme = null, purchases = null) {
   if (theme !== null) storage.set('pocket.theme.v1', theme);
   function node(id) {
     if (!nodes.has(id)) nodes.set(id, {
-      value: id === 'period' ? 'month' : id === 'category-filter' ? 'all' : '',
+      value: id === 'category-filter' ? 'all' : '',
       innerHTML: '', textContent: '', hidden: false, children: [], handlers: {},
       attributes: {}, classList: { toggle() {} }, setAttribute(key, value) { this.attributes[key] = value; }, add() {}, focus() {},
       addEventListener(type, fn) { this.handlers[type] = fn; },
@@ -62,10 +62,23 @@ test('theme follows preference changes from another tab and ignores invalid pref
   for (const handler of a.windowHandlers.storage) handler({ key: null, newValue: null });
   assert.equal(a.documentElement.dataset.theme, 'light');
 });
-test('new tracker starts empty and lists all ten categories', async () => {
+test('new tracker starts empty and lists all fourteen categories', async () => {
   const a = app(); assert.equal(a.run('records.length'), 0);
   assert.equal(a.node('total-spent').textContent, '€0.00');
-  assert.equal((a.node('category-list').innerHTML.match(/class="category-row"/g) || []).length, 10);
+  assert.equal((a.node('category-list').innerHTML.match(/class="category-row"/g) || []).length, 14);
+});
+test('legacy Bills purchases load and restore as Subscriptions', async () => {
+  const bill = { id: 'old-bill', cents: 1250, category: 'Bills', note: 'Internet', date: '2026-10-13', createdAt: 1 };
+  const a = app(JSON.stringify([bill]));
+  assert.equal(a.run('records[0].category'), 'Subscriptions');
+  const backup = { app: 'pocket', version: 1, purchases: [{ ...bill, id: 'backup-bill' }] };
+  const file = { size: 100, text: async () => JSON.stringify(backup) };
+  await a.node('import-backup').handlers.change({ target: { files: [file], value: 'backup.json' } });
+  const saved = JSON.parse(a.storage.get('pocket.purchases.v1'));
+  assert.deepEqual(saved.map(({ id, category, cents }) => ({ id, category, cents })), [
+    { id: 'old-bill', category: 'Subscriptions', cents: 1250 },
+    { id: 'backup-bill', category: 'Subscriptions', cents: 1250 },
+  ]);
 });
 test('purchase entry accepts decimal comma, saves exact cents and survives reload', async () => {
   const a = app(); await a.submit('12,50'); await a.submit('0.10', 'Drinks');
@@ -80,14 +93,17 @@ test('invalid amounts and impossible dates never save', async () => {
   assert.equal(a.run('records.length'), 0);
   assert.ok(a.node('form-error').textContent);
 });
-test('day, Monday-based week, month, year and all-time totals filter correctly', async () => {
+test('month navigation updates spending totals across month boundaries', async () => {
   const a = app(); await a.submit('10', 'Food', '2026-10-13'); await a.submit('20', 'Car', '2026-10-12');
-  await a.submit('30', 'Bills', '2026-09-30'); await a.submit('40', 'House', '2025-12-31');
-  a.run("anchor=parseDate('2026-10-13')");
-  for (const [period, expected] of [['day',1000],['week',3000],['month',3000],['year',6000],['all',10000]]) {
-    a.node('period').value=period;
-    assert.equal(a.run('filtered().reduce((s,r)=>s+r.cents,0)'), expected);
-  }
+  await a.submit('30', 'Subscriptions', '2026-09-30'); await a.submit('40', 'House', '2025-12-31');
+  a.run("anchor=parseDate('2026-10-13'); render()");
+  assert.equal(a.node('total-spent').textContent, '€30.00');
+  a.node('previous-period').handlers.click();
+  assert.equal(a.node('period-label').textContent, 'September 2026');
+  assert.equal(a.node('total-spent').textContent, '€30.00');
+  a.node('next-period').handlers.click();
+  a.node('next-period').handlers.click();
+  assert.equal(a.node('total-spent').textContent, '€0.00');
 });
 test('editing replaces the original record and category filtering safely renders notes', async () => {
   const a = app(); await a.submit('10', 'Food', '2026-10-13', '<img src=x onerror=alert(1)>');
@@ -148,7 +164,6 @@ test('native export failures are shown without losing purchases', async () => {
 test('Android CSV export retains spreadsheet formula escaping', async () => {
   const a = app();
   await a.submit('1.25', 'Food', '2026-10-13', '=1+1');
-  a.node('period').value = 'all';
   let content;
   a.run('window.pocketNative = {}');
   a.run('window').pocketNative.exportFile = async text => { content = text; };

@@ -14,7 +14,7 @@ public final class MerchantCategory {
         {"Car", "petrol|gas station|fuel|degaline|degalines|autoservisas|car wash|carwash|auto repair|tyres|tires|parking|parkavimas"},
         {"House", "ikea|senukai|depo|furniture|baldai|hardware store|home improvement"},
         {"Drinks", "liquor|wine shop|beer shop|bottle shop|vynoteka|alkoteka"},
-        {"Bills", "electricity|utilities|water utility|internet bill|telia|tele2|ignitis|vilniaus vandenys"},
+        {"Subscriptions", "electricity|utilities|water utility|internet bill|telia|tele2|ignitis|vilniaus vandenys"},
         {"Paysera", "paysera"},
     };
 

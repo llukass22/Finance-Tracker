@@ -50,6 +50,24 @@ public class PurchaseDatabaseTest {
         assertEquals("old", database.read().getJSONArray("purchases").getJSONObject(0).getString("id"));
     }
 
+    @Test public void versionThreeBillsPurchasesAndVendorRulesBecomeSubscriptions() throws Exception {
+        database.migrate(new JSONArray().put(record("old", 1250)));
+        android.database.sqlite.SQLiteDatabase legacy = database.getWritableDatabase();
+        legacy.execSQL("UPDATE purchases SET category = 'Bills' WHERE id = 'old'");
+        legacy.execSQL("INSERT INTO merchant_categories VALUES ('abc shop', 'Bills')");
+        legacy.setVersion(3);
+        database.close();
+
+        database = new PurchaseDatabase(context, name);
+        JSONObject state = database.read();
+        JSONObject purchase = state.getJSONArray("purchases").getJSONObject(0);
+        assertTrue(state.getBoolean("migrated"));
+        assertEquals("old", purchase.getString("id"));
+        assertEquals(1250, purchase.getLong("cents"));
+        assertEquals("Subscriptions", purchase.getString("category"));
+        assertEquals("Subscriptions", database.categoryForMerchant("ABC Shop"));
+    }
+
     @Test public void invalidMigrationIsRetryable() throws Exception {
         try {
             database.migrate(new JSONArray().put(record("good", 100)).put(record("bad", 100).put("date", "2026-02-30")));

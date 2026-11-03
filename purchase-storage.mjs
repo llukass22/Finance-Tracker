@@ -7,11 +7,11 @@ export function createPurchaseStorage(plugin, legacyStorage, source = 'localStor
       if (!validate(state.purchases)) throw new Error('Invalid native purchases');
       return state.purchases;
     },
-    async load(validate) {
+    async load(validate, normalizeLegacy = purchases => purchases) {
       let state = await plugin.read({ source });
       if (!state.migrated) {
         const raw = legacyStorage.getItem('pocket.purchases.v1');
-        const purchases = raw === null ? [] : JSON.parse(raw);
+        const purchases = normalizeLegacy(raw === null ? [] : JSON.parse(raw));
         if (!validate(purchases)) throw new Error('Invalid legacy purchases');
         state = await plugin.migrate({ purchases, source });
       }

@@ -4,12 +4,16 @@ const paths = {
 car:'<path d="m5 7 2-4h10l2 4M5 7h14a2 2 0 0 1 2 2v7H3V9a2 2 0 0 1 2-2ZM5 16v3m14-3v3M6 11h2m8 0h2"/>',
 house:'<path d="m3 10 9-7 9 7M5 9v12h14V9M9 21v-8h6v8"/>',
 wallet:'<path d="M20 7H5a2 2 0 0 1 0-4h13v4M4 7v13h17V7m0 4h-6v5h6m-4-3h.01"/>',
+investing:'<path d="M3 3v18h18M7 15l5-5 4 3 5-6m-5 0h5v5"/>',
 food:'<path d="M5 3v7m3-7v7m-6-7v7c0 3 6 3 6 0M5 13v8M16 3c-4 3-4 10 0 10h2V3Zm2 10v8"/>',
 basket:'<path d="m8 3-4 7m12-7 4 7M2 10h20l-3 11H5Zm6 4v3m4-3v3m4-3v3"/>',
 drink:'<path d="M7 4h10l-1 17H8ZM6 8h12m-5 0 2-7h4"/>',
 bills:'<path d="M5 2h14v20l-3-2-4 2-4-2-3 2Zm4 5h6m-6 4h6m-6 4h3"/>',
 sports:'<path d="m6 6 12 12M4 9l5-5m6 16 5-5M2 7l5-5m10 20 5-5"/>',
+shirt:'<path d="M8 4 3 7l2 5 3-1v9h8v-9l3 1 2-5-5-3a4 4 0 0 1-8 0Z"/>',
 shipping:'<path d="m3 7 9-4 9 4v10l-9 4-9-4Zm0 0 9 4 9-4M12 11v10M8 5l9 4"/>',
+gift:'<rect x="3" y="8" width="18" height="4" rx="1"/><path d="M5 12v9h14v-9M12 8v13m0-13H8.5A2.5 2.5 0 1 1 11 5.5Zm0 0h3.5A2.5 2.5 0 1 0 13 5.5Z"/>',
+bus:'<rect x="4" y="3" width="16" height="16" rx="3"/><path d="M4 12h16M6 19v2m12-2v2M8 15h.01m8 0h.01M10 6h4"/>',
 uncategorized:'<circle cx="12" cy="12" r="9"/><path d="M9 9a3 3 0 0 1 6 0c0 2-3 2-3 5m0 3h.01"/>',
 edit:'<path d="m15 4 5 5M3 21l5-1L21 7a2 2 0 0 0-5-5L3 15Z"/>',
 trash:'<path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7m4-7v7"/>',
@@ -19,14 +23,18 @@ sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.
 };
 const icon = key => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[key]}</svg>`;
 const categories = [
-{name:'Car', color:'#b897e8', tint:'#f1eafa', icon:'car'},
 {name:'House', color:'#7dcaa4', tint:'#eaf7f0', icon:'house'},
+{name:'Investing', color:'#66bfa1', tint:'#e5f4ee', icon:'investing'},
 {name:'Paysera', color:'#edc467', tint:'#fcf5e3', icon:'wallet'},
-{name:'Eating Out', color:'#ef95a7', tint:'#fcecf0', icon:'food'},
+{name:'Subscriptions', color:'#eeab80', tint:'#fcf0e8', icon:'bills'},
+{name:'Car', color:'#b897e8', tint:'#f1eafa', icon:'car'},
+{name:'Transport', color:'#829ce8', tint:'#edf1fc', icon:'bus'},
 {name:'Food', color:'#94c9dd', tint:'#eaf5f9', icon:'basket'},
+{name:'Eating Out', color:'#ef95a7', tint:'#fcecf0', icon:'food'},
 {name:'Drinks', color:'#b4d67d', tint:'#f1f7e6', icon:'drink'},
-{name:'Bills', color:'#eeab80', tint:'#fcf0e8', icon:'bills'},
 {name:'Sports', color:'#6eb9c2', tint:'#e8f5f6', icon:'sports'},
+{name:'Clothes', color:'#ba91c9', tint:'#f4edf7', icon:'shirt'},
+{name:'Gifts', color:'#d889be', tint:'#f8eaf4', icon:'gift'},
 {name:'Etsy (shipping labels)', color:'#e68b59', tint:'#fcf0e7', icon:'shipping'},
 {name:'Uncategorized', color:'#a0a7b4', tint:'#eef0f4', icon:'uncategorized'}
 ];
@@ -59,9 +67,15 @@ const validDate = value => typeof value==='string' && /^\d{4}-\d{2}-\d{2}$/.test
 const escapeHTML = value => String(value).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const validRecord = r => r && typeof r.id==='string' && r.id.length>0 && r.id.length<=100 && Number.isSafeInteger(r.cents) && r.cents>0 && r.cents<=99999999999 && categoryMap.has(r.category) && typeof r.note==='string' && r.note.length<=200 && (r.merchant===undefined||(typeof r.merchant==='string'&&r.merchant.length<=200)) && validDate(r.date) && Number.isSafeInteger(r.createdAt) && r.createdAt>=0;
 const validRecords = data => Array.isArray(data)&&data.every(validRecord)&&new Set(data.map(r=>r.id)).size===data.length;
+function normalizeCategories(purchases) {
+  if (!Array.isArray(purchases)) return purchases;
+  return purchases.map(purchase => purchase?.category === 'Bills'
+    ? { ...purchase, category: 'Subscriptions' }
+    : purchase);
+}
 const purchaseStorage = window.pocketNative?.purchases;
 let records=[],anchor=new Date(),editingId=null,deletedRecord=null,toastTimer,storageHealthy=true,storageReady=!purchaseStorage,saveBusy=false,storageRevision=0,refreshPending=false;
-if(!purchaseStorage)try{const raw=localStorage.getItem(STORAGE_KEY);if(raw!==null){const data=JSON.parse(raw);if(!validRecords(data))throw new Error('Invalid stored records');records=data;}}catch{storageHealthy=false;}
+if(!purchaseStorage)try{const raw=localStorage.getItem(STORAGE_KEY);if(raw!==null){const data=normalizeCategories(JSON.parse(raw));if(!validRecords(data))throw new Error('Invalid stored records');records=data;}}catch{storageHealthy=false;}
 async function persist(next,rememberPurchaseId=null){
   if(!storageReady){notify('Purchases are still loading. Please try again.');return false;}
   if(!storageHealthy){notify('Storage could not be read. Recover your saved data before saving.');return false;}
@@ -81,9 +95,9 @@ async function refreshNativePurchases(){
 }
 window.addEventListener('pocket-purchases-changed',refreshNativePurchases);
 function notify(message,undo=false){clearTimeout(toastTimer);$('toast-message').textContent=message;$('undo-delete').hidden=!undo;$('toast').hidden=false;toastTimer=setTimeout(()=>{$('toast').hidden=true;},undo?10000:5500);}
-function bounds(){const mode=$('period').value;let start=new Date(anchor.getFullYear(),anchor.getMonth(),anchor.getDate(),12),end=new Date(start);if(mode==='all')return {start:null,end:null};if(mode==='week'){start.setDate(start.getDate()-((start.getDay()+6)%7));end=new Date(start);end.setDate(end.getDate()+6);}if(mode==='month'){start=new Date(anchor.getFullYear(),anchor.getMonth(),1,12);end=new Date(anchor.getFullYear(),anchor.getMonth()+1,0,12);}if(mode==='year'){start=new Date(anchor.getFullYear(),0,1,12);end=new Date(anchor.getFullYear(),11,31,12);}return {start:localDate(start),end:localDate(end)};}
-function filtered(){const b=bounds();return records.filter(r=>!b.start||(r.date>=b.start&&r.date<=b.end)).sort((a,b)=>b.date.localeCompare(a.date)||b.createdAt-a.createdAt);}
-function periodLabel(){const mode=$('period').value;const b=bounds();$('previous-period').disabled=mode==='all';$('next-period').disabled=mode==='all';let label='All time';if(mode==='day')label=anchor.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});if(mode==='month')label=anchor.toLocaleDateString('en-GB',{month:'long',year:'numeric'});if(mode==='year')label=String(anchor.getFullYear());if(mode==='week'){const s=parseDate(b.start),e=parseDate(b.end);label=`${s.toLocaleDateString('en-GB',{day:'numeric',month:'short'})} – ${e.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})}`;}$('period-label').textContent=label;}
+function bounds(){const year=anchor.getFullYear(),month=anchor.getMonth();return {start:localDate(new Date(year,month,1,12)),end:localDate(new Date(year,month+1,0,12))};}
+function filtered(){const b=bounds();return records.filter(r=>r.date>=b.start&&r.date<=b.end).sort((a,b)=>b.date.localeCompare(a.date)||b.createdAt-a.createdAt);}
+function periodLabel(){$('period-label').textContent=anchor.toLocaleDateString('en-GB',{month:'long',year:'numeric'});}
 function categoryIcon(c){return `<span class="category-icon" style="--color:${c.color};--tint:${c.tint}">${icon(c.icon)}</span>`;}
 function empty(message,detail,add=false){return `<div class="empty-state"><span class="empty-symbol">✧</span><strong>${message}</strong><p>${detail}</p>${add?'<button class="text-button" data-add>Add your first purchase ↗</button>':''}</div>`;}
 function purchaseRow(r){const c=categoryMap.get(r.category);return `<div class="purchase-row">${categoryIcon(c)}<div class="purchase-copy"><strong>${escapeHTML(r.note||r.category)}</strong><p>${r.category} · ${parseDate(r.date).toLocaleDateString('en-GB',{day:'numeric',month:'short'})}</p></div><span class="purchase-sum">${money(r.cents)}</span><div class="purchase-actions"><button data-edit="${escapeHTML(r.id)}" aria-label="Edit ${escapeHTML(r.note||r.category)}" title="Edit purchase">${icon('edit')}</button><button data-delete="${escapeHTML(r.id)}" aria-label="Delete ${escapeHTML(r.note||r.category)}" title="Delete purchase">${icon('trash')}</button></div></div>`;}
@@ -102,16 +116,15 @@ $('undo-delete').addEventListener('click',async()=>{if(deletedRecord&&await pers
 $('purchase-form').addEventListener('submit',async e=>{e.preventDefault();const raw=$('amount').value.trim().replace(',','.');if(!/^\d{1,9}(\.\d{1,2})?$/.test(raw)){$('form-error').textContent='Enter an amount with up to two decimal places, such as 12.50.';return;}const cents=Math.round(Number(raw)*100);if(cents<=0||cents>99999999999){$('form-error').textContent='Enter an amount greater than €0.00 and up to €999,999,999.99.';return;}const date=$('purchase-date').value;if(!validDate(date)){$('form-error').textContent='Choose a valid date.';return;}const old=records.find(r=>r.id===editingId);const record={...(old?.merchant?{merchant:old.merchant}:{}),id:old?.id||(globalThis.crypto?.randomUUID?.()||`p-${Date.now()}-${Math.random().toString(36).slice(2)}`),cents,category:$('purchase-category').value,note:$('note').value.trim(),date,createdAt:old?.createdAt||Date.now()};const next=old?records.map(r=>r.id===old.id?record:r):[...records,record];const rememberPurchaseId=purchaseStorage&&old?.merchant&&$('remember-category').checked?record.id:null;if(!await persist(next,rememberPurchaseId)){$('form-error').textContent='The purchase could not be saved. Your existing records are unchanged.';return;}$('purchase-dialog').close();anchor=parseDate(date);render();notify(rememberPurchaseId?'Purchase updated. Category remembered for this vendor.':old?'Purchase updated.':'Purchase saved.');});
 for(const id of ['overview-tab','mobile-overview'])$(id).addEventListener('click',()=>showView('overview'));
 for(const id of ['history-tab','mobile-history'])$(id).addEventListener('click',()=>showView('history'));
-$('period').addEventListener('change',render);
-function movePeriod(direction){const mode=$('period').value;if(mode==='day')anchor.setDate(anchor.getDate()+direction);if(mode==='week')anchor.setDate(anchor.getDate()+direction*7);if(mode==='month')anchor=new Date(anchor.getFullYear(),anchor.getMonth()+direction,1,12);if(mode==='year')anchor=new Date(anchor.getFullYear()+direction,0,1,12);render();}
+function movePeriod(direction){anchor=new Date(anchor.getFullYear(),anchor.getMonth()+direction,1,12);render();}
 $('previous-period').addEventListener('click',()=>movePeriod(-1));$('next-period').addEventListener('click',()=>movePeriod(1));
 $('category-filter').addEventListener('change',()=>renderHistory(filtered()));
 async function download(content,name,type){if(window.pocketNative){await window.pocketNative.exportFile(content,name);return;}const url=URL.createObjectURL(new Blob([content],{type})),a=document.createElement('a');a.href=url;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);}
 $('export-csv').addEventListener('click',async()=>{const cat=$('category-filter').value;const list=filtered().filter(r=>cat==='all'||r.category===cat);if(!list.length){notify('No purchases to export in this view.');return;}const cell=s=>`"${String(s).replace(/^[=+@-]/,"'$&").replace(/"/g,'""')}"`;try{await download('\uFEFFDate,Category,Amount (EUR),Note\r\n'+list.map(r=>[r.date,r.category,(r.cents/100).toFixed(2),r.note].map(cell).join(',')).join('\r\n'),`pocket-purchases-${localDate()}.csv`,'text/csv;charset=utf-8');notify(window.pocketNative?'CSV sharing finished.':'CSV exported.');}catch{notify('CSV export could not be completed. Try again.');}});
 $('backup-button').addEventListener('click',()=>{$('backup-error').textContent='';$('backup-dialog').showModal();});
 $('export-backup').addEventListener('click',async()=>{if(!storageReady||!storageHealthy){$('backup-error').textContent='Stored data could not be read. Recover the original browser storage before exporting.';return;}$('backup-error').textContent='';try{await download(JSON.stringify({app:'pocket',version:1,exportedAt:new Date().toISOString(),purchases:records},null,2),`pocket-backup-${localDate()}.json`,'application/json');notify(window.pocketNative?'Backup sharing finished.':'Backup downloaded.');}catch{$('backup-error').textContent='Backup export could not be completed. Try again.';}});
-$('import-backup').addEventListener('change',async e=>{const file=e.target.files[0];if(!file)return;try{if(file.size>10000000)throw new Error('This file is too large. Choose a Pocket JSON backup under 10 MB.');const data=JSON.parse(await file.text());if(data.app!=='pocket'||data.version!==1||!Array.isArray(data.purchases)||!data.purchases.every(validRecord)||new Set(data.purchases.map(r=>r.id)).size!==data.purchases.length)throw new Error('Choose a valid Pocket backup file.');const existing=new Set(records.map(r=>r.id));const added=data.purchases.filter(r=>!existing.has(r.id));if(!await persist([...records,...added]))throw new Error('The backup could not be saved.');render();$('backup-dialog').close();notify(`${added.length} purchase${added.length===1?'':'s'} restored.`);}catch(err){$('backup-error').textContent=err instanceof SyntaxError?'This file is not a valid JSON backup.':err.message;}e.target.value='';});
-window.addEventListener('storage',e=>{if(purchaseStorage||e.key!==STORAGE_KEY)return;try{const data=e.newValue?JSON.parse(e.newValue):[];if(!validRecords(data))throw new Error();records=data;storageHealthy=true;render();}catch{storageHealthy=false;notify('Stored records changed unexpectedly. Reload to recover your data.');}});
+$('import-backup').addEventListener('change',async e=>{const file=e.target.files[0];if(!file)return;try{if(file.size>10000000)throw new Error('This file is too large. Choose a Pocket JSON backup under 10 MB.');const data=JSON.parse(await file.text());const purchases=normalizeCategories(data.purchases);if(data.app!=='pocket'||data.version!==1||!validRecords(purchases))throw new Error('Choose a valid Pocket backup file.');const existing=new Set(records.map(r=>r.id));const added=purchases.filter(r=>!existing.has(r.id));if(!await persist([...records,...added]))throw new Error('The backup could not be saved.');render();$('backup-dialog').close();notify(`${added.length} purchase${added.length===1?'':'s'} restored.`);}catch(err){$('backup-error').textContent=err instanceof SyntaxError?'This file is not a valid JSON backup.':err.message;}e.target.value='';});
+window.addEventListener('storage',e=>{if(purchaseStorage||e.key!==STORAGE_KEY)return;try{const data=normalizeCategories(e.newValue?JSON.parse(e.newValue):[]);if(!validRecords(data))throw new Error();records=data;storageHealthy=true;render();}catch{storageHealthy=false;notify('Stored records changed unexpectedly. Reload to recover your data.');}});
 render();
-const purchasesReady = purchaseStorage ? purchaseStorage.load(validRecords).then(data=>{records=data;storageReady=true;render();if(refreshPending){refreshPending=false;void refreshNativePurchases();}}).catch(()=>{storageHealthy=false;storageReady=true;notify('Purchases could not be loaded. Saving is disabled to protect existing data.');}) : Promise.resolve();
+const purchasesReady = purchaseStorage ? purchaseStorage.load(validRecords,normalizeCategories).then(data=>{records=data;storageReady=true;render();if(refreshPending){refreshPending=false;void refreshNativePurchases();}}).catch(()=>{storageHealthy=false;storageReady=true;notify('Purchases could not be loaded. Saving is disabled to protect existing data.');}) : Promise.resolve();
 if(!storageHealthy)notify('Storage could not be read. Saving is disabled to protect existing data.');

@@ -36,13 +36,13 @@ public class NotificationImportDatabaseTest {
         database.importNotification(purchase("first", time, "Local Cafe"));
         JSONObject edited = database.read().getJSONArray("purchases").getJSONObject(0);
         assertEquals("Local Cafe", edited.getString("merchant"));
-        edited.put("category", "Bills").put("note", "Meeting with friends");
+        edited.put("category", "Subscriptions").put("note", "Meeting with friends");
         database.applyChanges(new JSONArray().put(edited), new JSONArray(), edited.getString("id"));
         database.close(); database = new PurchaseDatabase(context, name);
         database.importNotification(purchase("second", time + 1000, "LOCAL CAFÉ"));
         JSONArray records = database.read().getJSONArray("purchases");
         assertEquals("Meeting with friends", records.getJSONObject(0).getString("note"));
-        assertEquals("Bills", records.getJSONObject(1).getString("category"));
+        assertEquals("Subscriptions", records.getJSONObject(1).getString("category"));
         assertEquals("Eating Out", database.categoryForMerchant("Local Cafe Vilnius"));
     }
 

@@ -17,7 +17,7 @@ public class MerchantCategoryTest {
     @Test public void clearMerchantNamesMatchExistingCategories() {
         String[][] examples = {{"LIDL 123", "Food"}, {"MAXIMA LT", "Food"}, {"Kavinė Vilnius", "Eating Out"},
             {"Coffee House", "Eating Out"}, {"Autoservisas Vilnius", "Car"}, {"Car Wash", "Car"},
-            {"IKEA VILNIUS", "House"}, {"VYNOTEKA", "Drinks"}, {"IGNITIS", "Bills"}, {"Paysera", "Paysera"}};
+            {"IKEA VILNIUS", "House"}, {"VYNOTEKA", "Drinks"}, {"IGNITIS", "Subscriptions"}, {"Paysera", "Paysera"}};
         for (String[] example : examples) assertEquals(example[0], example[1], MerchantCategory.categorize(example[0]));
     }
 

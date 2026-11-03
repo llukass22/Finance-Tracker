@@ -19,10 +19,11 @@ import java.util.Set;
 /** App-private source of purchase records, independent of the WebView lifecycle. */
 public final class PurchaseDatabase extends SQLiteOpenHelper {
     private static final Set<String> CATEGORIES = new HashSet<>(Arrays.asList(
-        "Car", "House", "Paysera", "Eating Out", "Food", "Drinks", "Bills", "Sports", "Etsy (shipping labels)", "Uncategorized"));
+        "Car", "House", "Investing", "Paysera", "Eating Out", "Food", "Drinks", "Subscriptions",
+        "Sports", "Clothes", "Etsy (shipping labels)", "Gifts", "Transport", "Uncategorized"));
 
     public PurchaseDatabase(Context context) { this(context, "pocket-purchases.db"); }
-    PurchaseDatabase(Context context, String name) { super(context, name, null, 3); }
+    PurchaseDatabase(Context context, String name) { super(context, name, null, 4); }
 
     @Override public void onCreate(SQLiteDatabase db) {
         db.execSQL("CREATE TABLE purchases (id TEXT PRIMARY KEY NOT NULL, cents INTEGER NOT NULL CHECK(cents > 0 AND cents <= 99999999999), category TEXT NOT NULL, note TEXT NOT NULL, date TEXT NOT NULL, createdAt INTEGER NOT NULL CHECK(createdAt >= 0))");
@@ -34,6 +35,10 @@ public final class PurchaseDatabase extends SQLiteOpenHelper {
     @Override public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
         if (oldVersion < 2) createImportReceipts(db);
         if (oldVersion < 3) createMerchantRules(db);
+        if (oldVersion < 4) {
+            db.execSQL("UPDATE purchases SET category = 'Subscriptions' WHERE category = 'Bills'");
+            db.execSQL("UPDATE merchant_categories SET category = 'Subscriptions' WHERE category = 'Bills'");
+        }
     }
 
     private static void createMerchantRules(SQLiteDatabase db) {
