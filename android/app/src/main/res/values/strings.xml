@@ -3,7 +3,7 @@
     <string name="app_name">Pocket</string>
     <string name="notification_listener_name">Pocket notification access</string>
     <string name="purchase_notification_channel">Automatic purchases</string>
-    <string name="purchase_notification_channel_description">Confirmation when a Wallet purchase or SEB payment is saved in Pocket</string>
+    <string name="purchase_notification_channel_description">Confirmation when a payment is automatically saved in Pocket</string>
     <string name="purchase_notification_title">Purchase recorded</string>
     <string name="purchase_notification_category">Category: %1$s</string>
     <string name="title_activity_main">Pocket</string>

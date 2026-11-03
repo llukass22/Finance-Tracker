@@ -19,6 +19,8 @@ public final class PurchaseNotificationParser {
     private static final Pattern NON_PURCHASE = Pattern.compile("\\b(declined|failed|cancelled|canceled|refunded?|refunds|reversed|reversal|cashback|verification|one.time (?:code|password)|OTP)\\b", Pattern.CASE_INSENSITIVE);
     private static final Pattern UNCERTAIN = Pattern.compile("\\b(pending|pre.?authori[sz](?:ation|ed)|hold|balance|available)\\b", Pattern.CASE_INSENSITIVE);
     private static final Pattern AT_MERCHANT = Pattern.compile("(?:^|\\b)(?:at|to)\\s+(.+)$", Pattern.CASE_INSENSITIVE);
+    private static final Pattern SWEDBANK_HEADING = Pattern.compile("^Notification from Swedbank ", Pattern.CASE_INSENSITIVE);
+    private static final Pattern SWEDBANK_OUTGOING = Pattern.compile("^(" + NUMBER + ") EUR has been sent to (.+)$", Pattern.CASE_INSENSITIVE);
     private static final String SEB_HEADING = "Nauja operacija";
     private static final Pattern SEB_OUTGOING = Pattern.compile("^Pervedėte\\s+(" + NUMBER + ")\\s+(" + CODE + ")\\s+(.+)$", Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
     private static final Pattern SEB_PURPOSE = Pattern.compile("\\s+Paskirtis\\s*:.*$", Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
@@ -117,6 +119,25 @@ public final class PurchaseNotificationParser {
             payment = new Result("parsed", null, value, code, recipient);
         }
         return payment;
+    }
+
+    /** Swedbank Lietuva's English outgoing transfer format. */
+    public static Result parseSwedbank(String text, String bigText) {
+        for (String field : new String[]{text, bigText}) {
+            if (field != null && field.length() > 10000) return review("text_too_long");
+        }
+        String body = SWEDBANK_HEADING.matcher(normalize(text)).replaceFirst("");
+        String expanded = SWEDBANK_HEADING.matcher(normalize(bigText)).replaceFirst("");
+        if (!expanded.startsWith(body) && !body.startsWith(expanded)) {
+            return review("conflicting_notification_text");
+        }
+        Matcher outgoing = SWEDBANK_OUTGOING.matcher(expanded.length() > body.length() ? expanded : body);
+        if (!outgoing.matches()) return new Result("ignored", "not_swedbank_outgoing_payment", null, null, null);
+        Long value = cents(outgoing.group(1));
+        if (value == null) return review("invalid_or_ambiguous_amount");
+        String recipient = merchant(outgoing.group(2).replaceFirst("\\.$", ""));
+        if (recipient == null) return review("missing_merchant");
+        return new Result("parsed", null, value, "EUR", recipient);
     }
 
     public static Result parse(String title, String text, String bigText, String subText) {
