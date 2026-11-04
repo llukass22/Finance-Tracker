@@ -87,6 +87,46 @@ test('purchase entry accepts decimal comma, saves exact cents and survives reloa
   const b = app(a.storage.get('pocket.purchases.v1'));
   assert.equal(b.run('records.length'), 2);
 });
+test('chart slices show monthly category spending and can return to the total', async () => {
+  const a = app();
+  await a.submit('12.50', 'Food');
+  await a.submit('7.50', 'Transport');
+  await a.submit('3.00', 'Food', '2026-09-13');
+  await a.submit('2.50', 'Food');
+
+  const chart = a.node('spending-chart');
+  const click = target => a.node('chart-card').handlers.click({ target });
+  assert.match(chart.innerHTML, /data-chart-category="Food"[^>]+aria-label="Food: €15\.00"/);
+  const slice = name => ({
+    ...a.node(name),
+    dataset: { chartCategory: name },
+    closest() { return this; },
+  });
+  const food = slice('Food'), transport = slice('Transport');
+  chart.querySelectorAll = () => [food, transport];
+  click(food);
+  assert.equal(a.node('chart-selection-label').textContent, 'Food');
+  assert.equal(a.node('total-spent').textContent, '€15.00');
+  assert.equal(a.node('purchase-count').textContent, '2 purchases');
+  assert.equal(food.attributes['aria-pressed'], 'true');
+
+  chart.handlers.keydown({ target: transport, key: 'Enter', preventDefault() {} });
+  assert.equal(a.node('chart-selection-label').textContent, 'Transport');
+  assert.equal(a.node('total-spent').textContent, '€7.50');
+  assert.equal(food.attributes['aria-pressed'], 'false');
+  click({ closest: () => null });
+  assert.equal(a.node('chart-selection-label').textContent, 'Total spent');
+  assert.equal(a.node('total-spent').textContent, '€22.50');
+  assert.equal(transport.attributes['aria-pressed'], 'false');
+
+  click(food);
+  click(food);
+  assert.equal(a.node('total-spent').textContent, '€22.50');
+  click(food);
+  a.node('previous-period').handlers.click();
+  assert.equal(a.node('chart-selection-label').textContent, 'Total spent');
+  assert.equal(a.node('total-spent').textContent, '€3.00');
+});
 test('invalid amounts and impossible dates never save', async () => {
   const a = app(); for (const value of ['0','-1','1.234','abc','1e3']) await a.submit(value);
   await a.submit('10', 'Food', '2026-02-30');

@@ -102,7 +102,88 @@ function categoryIcon(c){return `<span class="category-icon" style="--color:${c.
 function empty(message,detail,add=false){return `<div class="empty-state"><span class="empty-symbol">✧</span><strong>${message}</strong><p>${detail}</p>${add?'<button class="text-button" data-add>Add your first purchase ↗</button>':''}</div>`;}
 function purchaseRow(r){const c=categoryMap.get(r.category);return `<div class="purchase-row">${categoryIcon(c)}<div class="purchase-copy"><strong>${escapeHTML(r.note||r.category)}</strong><p>${r.category} · ${parseDate(r.date).toLocaleDateString('en-GB',{day:'numeric',month:'short'})}</p></div><span class="purchase-sum">${money(r.cents)}</span><div class="purchase-actions"><button data-edit="${escapeHTML(r.id)}" aria-label="Edit ${escapeHTML(r.note||r.category)}" title="Edit purchase">${icon('edit')}</button><button data-delete="${escapeHTML(r.id)}" aria-label="Delete ${escapeHTML(r.note||r.category)}" title="Delete purchase">${icon('trash')}</button></div></div>`;}
 function renderHistory(list){const cat=$('category-filter').value;const visible=list.filter(r=>cat==='all'||r.category===cat);let lastDate='';$('history-list').innerHTML=visible.length?visible.map(r=>{let heading='';if(r.date!==lastDate){heading=`<p class="history-group">${parseDate(r.date).toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}</p>`;lastDate=r.date;}return heading+purchaseRow(r);}).join(''):empty('No purchases found',cat!=='all'?'Try another category.':'Purchases in this period will appear here.',!records.length);}
-function render(){periodLabel();const list=filtered(),total=list.reduce((sum,r)=>sum+r.cents,0);const totals=categories.map(c=>({...c,cents:list.filter(r=>r.category===c.name).reduce((sum,r)=>sum+r.cents,0)}));$('total-spent').textContent=money(total);$('purchase-count').textContent=`${list.length} purchase${list.length===1?'':'s'}`;$('history-count').textContent=list.length;const circumference=2*Math.PI*116;let offset=0;let arcs='<circle cx="140" cy="140" r="116" fill="none" stroke="#edf1e6" stroke-width="29"/>';totals.filter(c=>c.cents).forEach(c=>{const length=c.cents/total*circumference;const gap=totals.filter(c=>c.cents).length>1?Math.min(5,length*.18):0;arcs+=`<circle cx="140" cy="140" r="116" fill="none" stroke="${c.color}" stroke-width="29" stroke-dasharray="${length-gap} ${circumference-(length-gap)}" stroke-dashoffset="${-offset-gap/2}" transform="rotate(-90 140 140)"><title>${c.name}: ${money(c.cents)}</title></circle>`;offset+=length;});$('spending-chart').innerHTML=arcs;$('spending-chart').setAttribute('aria-label',total?`Spending by category. Total ${money(total)}. ${totals.filter(c=>c.cents).map(c=>`${c.name} ${money(c.cents)}`).join(', ')}`:'No purchases in this period');$('category-list').innerHTML=totals.map(c=>`<button class="category-row" data-add="${c.name}" aria-label="Add a purchase to ${c.name}">${categoryIcon(c)}<span class="category-name">${c.name}</span><span class="category-amount">${money(c.cents)}</span><span class="category-percent">${total?Math.round(c.cents/total*100):0}%</span></button>`).join('');const top=totals.reduce((a,c)=>c.cents>a.cents?c:a,totals[0]);$('chart-insight').textContent=total?`${top.name} makes up ${Math.round(top.cents/total*100)}% of your spending.`:'Your next purchase starts the picture.';renderHistory(list);}
+let selectedChartCategory = null;
+
+function renderChartCenter(purchases) {
+  const visible = selectedChartCategory
+    ? purchases.filter(purchase => purchase.category === selectedChartCategory)
+    : purchases;
+  const cents = visible.reduce((sum, purchase) => sum + purchase.cents, 0);
+  $('chart-selection-label').textContent = selectedChartCategory || 'Total spent';
+  $('total-spent').textContent = money(cents);
+  $('purchase-count').textContent = `${visible.length} purchase${visible.length === 1 ? '' : 's'}`;
+}
+
+function renderChart(purchases, totals, total) {
+  const chart = $('spending-chart');
+  const slices = totals.filter(category => category.cents > 0);
+  if (!slices.some(category => category.name === selectedChartCategory)) selectedChartCategory = null;
+  renderChartCenter(purchases);
+
+  const radius = 116;
+  const pointAt = angle => `${140 + radius * Math.sin(angle)} ${140 - radius * Math.cos(angle)}`;
+  let offset = 0;
+  const arcs = slices.map(category => {
+    const attributes = `class="chart-slice" data-chart-category="${category.name}" role="button" tabindex="0" aria-label="${category.name}: ${money(category.cents)}" aria-pressed="${category.name === selectedChartCategory}" fill="none" stroke="${category.color}" stroke-width="29"`;
+    if (slices.length === 1) return `<circle cx="140" cy="140" r="${radius}" ${attributes}/>`;
+
+    const angle = category.cents / total * 2 * Math.PI;
+    const gap = Math.min(5 / radius, angle * .18);
+    const start = offset + gap / 2;
+    const end = offset + angle - gap / 2;
+    offset += angle;
+    const largeArc = end - start > Math.PI ? 1 : 0;
+    return `<path d="M ${pointAt(start)} A ${radius} ${radius} 0 ${largeArc} 1 ${pointAt(end)}" ${attributes}/>`;
+  });
+  chart.innerHTML = `<circle cx="140" cy="140" r="${radius}" fill="none" stroke-width="29" aria-hidden="true"/>${arcs.join('')}`;
+  chart.setAttribute('aria-label', total ? `Spending by category. Total ${money(total)}.` : 'No purchases in this period');
+}
+
+function updateChartSelection(name) {
+  const next = selectedChartCategory === name ? null : name;
+  if (next === selectedChartCategory) return;
+  selectedChartCategory = next;
+  for (const button of $('spending-chart').querySelectorAll('[data-chart-category]')) {
+    button.setAttribute('aria-pressed', String(button.dataset.chartCategory === selectedChartCategory));
+  }
+  renderChartCenter(filtered());
+}
+
+$('chart-card').addEventListener('click', event => {
+  const slice = event.target.closest('[data-chart-category]');
+  updateChartSelection(slice?.dataset.chartCategory ?? null);
+});
+$('spending-chart').addEventListener('keydown', event => {
+  if (event.key !== 'Enter' && event.key !== ' ') return;
+  const slice = event.target.closest('[data-chart-category]');
+  if (!slice) return;
+  event.preventDefault();
+  if (!event.repeat) updateChartSelection(slice.dataset.chartCategory);
+});
+
+function render() {
+  periodLabel();
+  const list = filtered();
+  const total = list.reduce((sum, purchase) => sum + purchase.cents, 0);
+  const totals = categories.map(category => ({
+    ...category,
+    cents: list.filter(purchase => purchase.category === category.name).reduce((sum, purchase) => sum + purchase.cents, 0),
+  }));
+  $('history-count').textContent = list.length;
+  renderChart(list, totals, total);
+  $('category-list').innerHTML = totals.map(category => `
+    <button class="category-row" data-add="${category.name}" aria-label="Add a purchase to ${category.name}">
+      ${categoryIcon(category)}
+      <span class="category-name">${category.name}</span>
+      <span class="category-amount">${money(category.cents)}</span>
+      <span class="category-percent">${total ? Math.round(category.cents / total * 100) : 0}%</span>
+    </button>`).join('');
+  const top = totals.reduce((highest, category) => category.cents > highest.cents ? category : highest, totals[0]);
+  $('chart-insight').textContent = total
+    ? `${top.name} makes up ${Math.round(top.cents / total * 100)}% of your spending.`
+    : 'Your next purchase starts the picture.';
+  renderHistory(list);
+}
 function showView(view){const overview=view==='overview';$('overview').hidden=!overview;$('history').hidden=overview;for(const [id,on] of [['overview-tab',overview],['history-tab',!overview],['mobile-overview',overview],['mobile-history',!overview]]){$(id).classList.toggle('active',on);if(id.endsWith('-tab'))$(id).setAttribute('aria-selected',on);}if(!overview)renderHistory(filtered());}
 function selectCategory(name){$('purchase-category').value=name;for(const button of $('category-picker').children){const on=button.dataset.category===name;button.classList.toggle('active',on);button.setAttribute('aria-pressed',on);}}
 function openPurchase(category='Food',record=null){editingId=record?.id||null;$('purchase-form').reset();$('form-title').textContent=record?'Edit purchase':'Add a purchase';$('amount').value=record?(record.cents/100).toFixed(2):'';$('note').value=record?.note||'';$('purchase-date').value=record?.date||localDate();$('form-error').textContent='';$('remember-category').checked=false;$('remember-category-option').hidden=!(purchaseStorage&&record?.merchant&&record.merchant.normalize('NFD').replace(/[\u0300-\u036f]/g,'').match(/[\p{L}\p{N}]/u));$('remember-vendor').textContent=record?.merchant||'';selectCategory(record?.category||category);$('purchase-dialog').showModal();setTimeout(()=>$('amount').focus(),50);}
@@ -116,7 +197,7 @@ $('undo-delete').addEventListener('click',async()=>{if(deletedRecord&&await pers
 $('purchase-form').addEventListener('submit',async e=>{e.preventDefault();const raw=$('amount').value.trim().replace(',','.');if(!/^\d{1,9}(\.\d{1,2})?$/.test(raw)){$('form-error').textContent='Enter an amount with up to two decimal places, such as 12.50.';return;}const cents=Math.round(Number(raw)*100);if(cents<=0||cents>99999999999){$('form-error').textContent='Enter an amount greater than €0.00 and up to €999,999,999.99.';return;}const date=$('purchase-date').value;if(!validDate(date)){$('form-error').textContent='Choose a valid date.';return;}const old=records.find(r=>r.id===editingId);const record={...(old?.merchant?{merchant:old.merchant}:{}),id:old?.id||(globalThis.crypto?.randomUUID?.()||`p-${Date.now()}-${Math.random().toString(36).slice(2)}`),cents,category:$('purchase-category').value,note:$('note').value.trim(),date,createdAt:old?.createdAt||Date.now()};const next=old?records.map(r=>r.id===old.id?record:r):[...records,record];const rememberPurchaseId=purchaseStorage&&old?.merchant&&$('remember-category').checked?record.id:null;if(!await persist(next,rememberPurchaseId)){$('form-error').textContent='The purchase could not be saved. Your existing records are unchanged.';return;}$('purchase-dialog').close();anchor=parseDate(date);render();notify(rememberPurchaseId?'Purchase updated. Category remembered for this vendor.':old?'Purchase updated.':'Purchase saved.');});
 for(const id of ['overview-tab','mobile-overview'])$(id).addEventListener('click',()=>showView('overview'));
 for(const id of ['history-tab','mobile-history'])$(id).addEventListener('click',()=>showView('history'));
-function movePeriod(direction){anchor=new Date(anchor.getFullYear(),anchor.getMonth()+direction,1,12);render();}
+function movePeriod(direction){anchor=new Date(anchor.getFullYear(),anchor.getMonth()+direction,1,12);selectedChartCategory=null;render();}
 $('previous-period').addEventListener('click',()=>movePeriod(-1));$('next-period').addEventListener('click',()=>movePeriod(1));
 $('category-filter').addEventListener('change',()=>renderHistory(filtered()));
 async function download(content,name,type){if(window.pocketNative){await window.pocketNative.exportFile(content,name);return;}const url=URL.createObjectURL(new Blob([content],{type})),a=document.createElement('a');a.href=url;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);}
