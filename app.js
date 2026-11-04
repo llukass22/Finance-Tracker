@@ -161,23 +161,40 @@ $('spending-chart').addEventListener('keydown', event => {
   if (!event.repeat) updateChartSelection(slice.dataset.chartCategory);
 });
 
+function renderCategories(totals, total) {
+  const list = $('category-list');
+  const expanded = new Set([...list.querySelectorAll('details[open]')].map(row => row.dataset.category));
+  list.innerHTML = totals.map(category => {
+    const purchases = category.purchases.map(purchase => `
+      <li>
+        <span>${escapeHTML(purchase.note.trim() || purchase.merchant?.trim() || purchase.category)}</span>
+        <strong>${money(purchase.cents)}</strong>
+      </li>`).join('');
+    return `
+      <details class="category-details" data-category="${category.name}"${expanded.has(category.name) ? ' open' : ''}>
+        <summary class="category-row">
+          ${categoryIcon(category)}
+          <span class="category-name">${category.name}</span>
+          <span class="category-amount">${money(category.cents)}</span>
+          <span class="category-percent">${total ? Math.round(category.cents / total * 100) : 0}%</span>
+        </summary>
+        ${purchases ? `<ul class="category-purchases" role="list">${purchases}</ul>` : '<p class="category-empty">No purchases this month.</p>'}
+      </details>`;
+  }).join('');
+}
+
 function render() {
   periodLabel();
   const list = filtered();
   const total = list.reduce((sum, purchase) => sum + purchase.cents, 0);
-  const totals = categories.map(category => ({
-    ...category,
-    cents: list.filter(purchase => purchase.category === category.name).reduce((sum, purchase) => sum + purchase.cents, 0),
-  }));
+  const totals = categories.map(category => {
+    const purchases = list.filter(purchase => purchase.category === category.name);
+    const cents = purchases.reduce((sum, purchase) => sum + purchase.cents, 0);
+    return { ...category, cents, purchases };
+  });
   $('history-count').textContent = list.length;
   renderChart(list, totals, total);
-  $('category-list').innerHTML = totals.map(category => `
-    <button class="category-row" data-add="${category.name}" aria-label="Add a purchase to ${category.name}">
-      ${categoryIcon(category)}
-      <span class="category-name">${category.name}</span>
-      <span class="category-amount">${money(category.cents)}</span>
-      <span class="category-percent">${total ? Math.round(category.cents / total * 100) : 0}%</span>
-    </button>`).join('');
+  renderCategories(totals, total);
   const top = totals.reduce((highest, category) => category.cents > highest.cents ? category : highest, totals[0]);
   $('chart-insight').textContent = total
     ? `${top.name} makes up ${Math.round(top.cents / total * 100)}% of your spending.`

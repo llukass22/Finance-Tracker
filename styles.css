@@ -50,7 +50,27 @@ dialog label, .category-picker button, .toast { font-size: 1rem; }
 input, select, .primary-button, .secondary-button { min-height: 48px; }
 .tabs button, .text-button, .category-picker button, .toast button { min-height: 44px; }
 .category-icon { width: 40px; height: 40px; }
-.category-row { min-height: 64px; }
+.category-details { border-bottom: 1px solid var(--line); }
+.category-details:last-child { border-bottom: 0; }
+.category-row { min-height: 64px; border-bottom: 0; cursor: pointer; }
+.category-row::-webkit-details-marker { display: none; }
+.category-row:focus-visible { outline: 2px solid var(--green); outline-offset: -2px; }
+.category-row::after {
+  content: '';
+  flex: 0 0 auto;
+  width: 7px;
+  height: 7px;
+  margin-inline: 3px;
+  border: solid var(--muted);
+  border-width: 0 2px 2px 0;
+  transform: translateY(-2px) rotate(45deg);
+}
+.category-details[open] > .category-row::after { transform: translateY(2px) rotate(225deg); }
+.category-purchases { list-style: none; margin: 0 0 12px; padding: 4px 12px; border-radius: 10px; background: var(--soft); }
+.category-purchases li { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; }
+.category-purchases span { min-width: 0; overflow-wrap: anywhere; }
+.category-purchases strong { flex-shrink: 0; font-variant-numeric: tabular-nums; }
+.category-empty { margin: 0 0 12px; padding-inline: 12px; color: var(--muted); font-size: .875rem; }
 .category-name { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .category-amount { margin-left: 0; overflow-wrap: anywhere; }
 .category-percent { flex-shrink: 0; }

@@ -12,6 +12,7 @@ function app(stored = null, failSave = false, theme = null, purchases = null) {
     if (!nodes.has(id)) nodes.set(id, {
       value: id === 'category-filter' ? 'all' : '',
       innerHTML: '', textContent: '', hidden: false, children: [], handlers: {},
+      querySelectorAll() { return []; },
       attributes: {}, classList: { toggle() {} }, setAttribute(key, value) { this.attributes[key] = value; }, add() {}, focus() {},
       addEventListener(type, fn) { this.handlers[type] = fn; },
       showModal() { this.open = true; }, close() { this.open = false; }, reset() {},
@@ -86,6 +87,21 @@ test('purchase entry accepts decimal comma, saves exact cents and survives reloa
   assert.equal(a.node('total-spent').textContent, '€12.60');
   const b = app(a.storage.get('pocket.purchases.v1'));
   assert.equal(b.run('records.length'), 2);
+});
+test('category disclosures prefer monthly purchase notes and fall back to titles', () => {
+  const a = app(JSON.stringify([
+    { id: '1', category: 'Food', date: '2026-10-13', note: '<Lunch>', merchant: 'Cafe', cents: 1250, createdAt: 1 },
+    { id: '2', category: 'Food', date: '2026-10-14', note: ' ', merchant: 'Bakery', cents: 425, createdAt: 2 },
+    { id: '3', category: 'Food', date: '2026-10-15', note: '', cents: 200, createdAt: 3 },
+    { id: '4', category: 'Food', date: '2026-09-13', note: 'Last month', cents: 300, createdAt: 4 },
+    { id: '5', category: 'Transport', date: '2026-10-15', note: 'Train', cents: 750, createdAt: 5 },
+  ]));
+  a.run("anchor=parseDate('2026-10-13'); render()");
+  const html = a.node('category-list').innerHTML;
+  const food = html.match(/<details[^>]+data-category="Food"[^>]*>([\s\S]*?)<\/details>/)[1];
+  const rows = [...food.matchAll(/<li>\s*<span>(.*?)<\/span>\s*<strong>(.*?)<\/strong>\s*<\/li>/g)];
+  assert.deepEqual(rows.map(match => match.slice(1)), [['Food', '€2.00'], ['Bakery', '€4.25'], ['&lt;Lunch&gt;', '€12.50']]);
+  assert.match(html, /<summary class="category-row">/);
 });
 test('chart slices show monthly category spending and can return to the total', async () => {
   const a = app();
