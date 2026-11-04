@@ -68,6 +68,22 @@ public class PurchaseDatabaseTest {
         assertEquals("Subscriptions", database.categoryForMerchant("ABC Shop"));
     }
 
+    @Test public void versionFourEtsyPurchasesAndVendorRulesBecomeShippingLabels() throws Exception {
+        database.migrate(new JSONArray().put(record("label", 500)));
+        android.database.sqlite.SQLiteDatabase legacy = database.getWritableDatabase();
+        legacy.execSQL("UPDATE purchases SET category = 'Etsy (shipping labels)' WHERE id = 'label'");
+        legacy.execSQL("INSERT INTO merchant_categories VALUES ('etsy', 'Etsy (shipping labels)')");
+        legacy.setVersion(4);
+        database.close();
+
+        database = new PurchaseDatabase(context, name);
+        JSONObject purchase = database.read().getJSONArray("purchases").getJSONObject(0);
+        assertEquals("label", purchase.getString("id"));
+        assertEquals(500, purchase.getLong("cents"));
+        assertEquals("Shipping Labels", purchase.getString("category"));
+        assertEquals("Shipping Labels", database.categoryForMerchant("Etsy"));
+    }
+
     @Test public void invalidMigrationIsRetryable() throws Exception {
         try {
             database.migrate(new JSONArray().put(record("good", 100)).put(record("bad", 100).put("date", "2026-02-30")));

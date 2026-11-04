@@ -35,7 +35,7 @@ const categories = [
 {name:'Sports', color:'#6eb9c2', tint:'#e8f5f6', icon:'sports'},
 {name:'Clothes', color:'#ba91c9', tint:'#f4edf7', icon:'shirt'},
 {name:'Gifts', color:'#d889be', tint:'#f8eaf4', icon:'gift'},
-{name:'Etsy (shipping labels)', color:'#e68b59', tint:'#fcf0e7', icon:'shipping'},
+{name:'Shipping Labels', color:'#e68b59', tint:'#fcf0e7', icon:'shipping'},
 {name:'Uncategorized', color:'#a0a7b4', tint:'#eef0f4', icon:'uncategorized'}
 ];
 const categoryMap = new Map(categories.map(c => [c.name,c]));
@@ -67,11 +67,16 @@ const validDate = value => typeof value==='string' && /^\d{4}-\d{2}-\d{2}$/.test
 const escapeHTML = value => String(value).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const validRecord = r => r && typeof r.id==='string' && r.id.length>0 && r.id.length<=100 && Number.isSafeInteger(r.cents) && r.cents>0 && r.cents<=99999999999 && categoryMap.has(r.category) && typeof r.note==='string' && r.note.length<=200 && (r.merchant===undefined||(typeof r.merchant==='string'&&r.merchant.length<=200)) && validDate(r.date) && Number.isSafeInteger(r.createdAt) && r.createdAt>=0;
 const validRecords = data => Array.isArray(data)&&data.every(validRecord)&&new Set(data.map(r=>r.id)).size===data.length;
+const legacyCategoryNames = new Map([
+  ['Bills', 'Subscriptions'],
+  ['Etsy (shipping labels)', 'Shipping Labels'],
+]);
 function normalizeCategories(purchases) {
   if (!Array.isArray(purchases)) return purchases;
-  return purchases.map(purchase => purchase?.category === 'Bills'
-    ? { ...purchase, category: 'Subscriptions' }
-    : purchase);
+  return purchases.map(purchase => {
+    const category = legacyCategoryNames.get(purchase?.category);
+    return category ? { ...purchase, category } : purchase;
+  });
 }
 const purchaseStorage = window.pocketNative?.purchases;
 let records=[],anchor=new Date(),editingId=null,deletedRecord=null,toastTimer,storageHealthy=true,storageReady=!purchaseStorage,saveBusy=false,storageRevision=0,refreshPending=false;
@@ -161,10 +166,46 @@ $('spending-chart').addEventListener('keydown', event => {
   if (!event.repeat) updateChartSelection(slice.dataset.chartCategory);
 });
 
+const categoryAnimations = new WeakMap();
+
+$('category-list').addEventListener('click', event => {
+  const summary = event.target.closest('.category-row');
+  if (!summary || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+  const details = summary.parentElement;
+  const content = summary.nextElementSibling;
+  if (!content.animate) return;
+
+  event.preventDefault();
+  const closing = details.open && !details.hasAttribute('data-closing');
+  const startHeight = details.open ? content.getBoundingClientRect().height : 0;
+  const startOpacity = details.open ? getComputedStyle(content).opacity : 0;
+  categoryAnimations.get(details)?.cancel();
+
+  // Keep the native disclosure open until its content finishes collapsing.
+  details.open = true;
+  details.toggleAttribute('data-closing', closing);
+  const endHeight = closing ? 0 : content.getBoundingClientRect().height;
+  const animation = content.animate([
+    { height: `${startHeight}px`, opacity: startOpacity },
+    { height: `${endHeight}px`, opacity: closing ? 0 : 1 },
+  ], { duration: 220, easing: 'ease-out', fill: 'both' });
+  categoryAnimations.set(details, animation);
+
+  animation.onfinish = () => {
+    if (categoryAnimations.get(details) !== animation) return;
+    details.open = !closing;
+    details.removeAttribute('data-closing');
+    categoryAnimations.delete(details);
+    animation.cancel();
+  };
+});
+
 function renderCategories(totals, total) {
   const list = $('category-list');
-  const expanded = new Set([...list.querySelectorAll('details[open]')].map(row => row.dataset.category));
-  list.innerHTML = totals.map(category => {
+  const expanded = new Set([...list.querySelectorAll('details[open]:not([data-closing])')].map(row => row.dataset.category));
+  const ranked = [...totals].sort((a, b) => b.cents - a.cents);
+  list.innerHTML = ranked.map(category => {
     const purchases = category.purchases.map(purchase => `
       <li>
         <span>${escapeHTML(purchase.note.trim() || purchase.merchant?.trim() || purchase.category)}</span>
@@ -178,7 +219,9 @@ function renderCategories(totals, total) {
           <span class="category-amount">${money(category.cents)}</span>
           <span class="category-percent">${total ? Math.round(category.cents / total * 100) : 0}%</span>
         </summary>
-        ${purchases ? `<ul class="category-purchases" role="list">${purchases}</ul>` : '<p class="category-empty">No purchases this month.</p>'}
+        <div class="category-content">
+          ${purchases ? `<ul class="category-purchases" role="list">${purchases}</ul>` : '<p class="category-empty">No purchases this month.</p>'}
+        </div>
       </details>`;
   }).join('');
 }
@@ -203,15 +246,25 @@ function render() {
 }
 function showView(view){const overview=view==='overview';$('overview').hidden=!overview;$('history').hidden=overview;for(const [id,on] of [['overview-tab',overview],['history-tab',!overview],['mobile-overview',overview],['mobile-history',!overview]]){$(id).classList.toggle('active',on);if(id.endsWith('-tab'))$(id).setAttribute('aria-selected',on);}if(!overview)renderHistory(filtered());}
 function selectCategory(name){$('purchase-category').value=name;for(const button of $('category-picker').children){const on=button.dataset.category===name;button.classList.toggle('active',on);button.setAttribute('aria-pressed',on);}}
-function openPurchase(category='Food',record=null){editingId=record?.id||null;$('purchase-form').reset();$('form-title').textContent=record?'Edit purchase':'Add a purchase';$('amount').value=record?(record.cents/100).toFixed(2):'';$('note').value=record?.note||'';$('purchase-date').value=record?.date||localDate();$('form-error').textContent='';$('remember-category').checked=false;$('remember-category-option').hidden=!(purchaseStorage&&record?.merchant&&record.merchant.normalize('NFD').replace(/[\u0300-\u036f]/g,'').match(/[\p{L}\p{N}]/u));$('remember-vendor').textContent=record?.merchant||'';selectCategory(record?.category||category);$('purchase-dialog').showModal();setTimeout(()=>$('amount').focus(),50);}
+function openPurchase(record=null){editingId=record?.id||null;$('purchase-form').reset();$('form-title').textContent=record?'Edit purchase':'Add a purchase';$('amount').value=record?(record.cents/100).toFixed(2):'';$('note').value=record?.note||'';$('purchase-date').value=record?.date||localDate();$('form-error').textContent='';$('remember-category').checked=false;$('remember-category-option').hidden=!(purchaseStorage&&record?.merchant&&record.merchant.normalize('NFD').replace(/[\u0300-\u036f]/g,'').match(/[\p{L}\p{N}]/u));$('remember-vendor').textContent=record?.merchant||'';selectCategory(record?.category||'');$('purchase-dialog').showModal();setTimeout(()=>$('amount').focus(),50);}
 $('backup-button').innerHTML=icon('backup');
 $('settings-button').addEventListener('click',()=>$('settings-dialog').showModal());
 for(const c of categories){$('purchase-category').add(new Option(c.name,c.name));$('category-filter').add(new Option(c.name,c.name));}
-$('category-picker').innerHTML=categories.map(c=>`<button type="button" data-category="${c.name}" style="--color:${c.color}" aria-pressed="false">${icon(c.icon)}${c.name}</button>`).join('');
+$('category-picker').innerHTML = categories.map(category => `
+  <button type="button" data-category="${category.name}" style="--color:${category.color}" aria-pressed="false">
+    ${icon(category.icon)}<span>${category.name}</span>
+  </button>`).join('');
 $('category-picker').addEventListener('click',e=>{const b=e.target.closest('[data-category]');if(b)selectCategory(b.dataset.category);});
-document.addEventListener('click',async e=>{const add=e.target.closest('[data-add]');if(add){openPurchase(add.dataset.add||'Food');return;}const edit=e.target.closest('[data-edit]');if(edit){const r=records.find(r=>r.id===edit.dataset.edit);if(r)openPurchase(r.category,r);return;}const del=e.target.closest('[data-delete]');if(del){const r=records.find(r=>r.id===del.dataset.delete);if(r&&await persist(records.filter(x=>x.id!==r.id))){deletedRecord=r;render();notify('Purchase deleted.',true);}}if(e.target.closest('.close-dialog'))e.target.closest('dialog').close();});
+document.addEventListener('click',async e=>{const add=e.target.closest('[data-add]');if(add){openPurchase();return;}const edit=e.target.closest('[data-edit]');if(edit){const r=records.find(r=>r.id===edit.dataset.edit);if(r)openPurchase(r);return;}const del=e.target.closest('[data-delete]');if(del){const r=records.find(r=>r.id===del.dataset.delete);if(r&&await persist(records.filter(x=>x.id!==r.id))){deletedRecord=r;render();notify('Purchase deleted.',true);}}if(e.target.closest('.close-dialog'))e.target.closest('dialog').close();});
 $('undo-delete').addEventListener('click',async()=>{if(deletedRecord&&await persist([...records,deletedRecord])){deletedRecord=null;render();notify('Purchase restored.');}});
-$('purchase-form').addEventListener('submit',async e=>{e.preventDefault();const raw=$('amount').value.trim().replace(',','.');if(!/^\d{1,9}(\.\d{1,2})?$/.test(raw)){$('form-error').textContent='Enter an amount with up to two decimal places, such as 12.50.';return;}const cents=Math.round(Number(raw)*100);if(cents<=0||cents>99999999999){$('form-error').textContent='Enter an amount greater than €0.00 and up to €999,999,999.99.';return;}const date=$('purchase-date').value;if(!validDate(date)){$('form-error').textContent='Choose a valid date.';return;}const old=records.find(r=>r.id===editingId);const record={...(old?.merchant?{merchant:old.merchant}:{}),id:old?.id||(globalThis.crypto?.randomUUID?.()||`p-${Date.now()}-${Math.random().toString(36).slice(2)}`),cents,category:$('purchase-category').value,note:$('note').value.trim(),date,createdAt:old?.createdAt||Date.now()};const next=old?records.map(r=>r.id===old.id?record:r):[...records,record];const rememberPurchaseId=purchaseStorage&&old?.merchant&&$('remember-category').checked?record.id:null;if(!await persist(next,rememberPurchaseId)){$('form-error').textContent='The purchase could not be saved. Your existing records are unchanged.';return;}$('purchase-dialog').close();anchor=parseDate(date);render();notify(rememberPurchaseId?'Purchase updated. Category remembered for this vendor.':old?'Purchase updated.':'Purchase saved.');});
+$('purchase-form').addEventListener('submit',async e=>{e.preventDefault();const raw=$('amount').value.trim().replace(',','.');if(!/^\d{1,9}(\.\d{1,2})?$/.test(raw)){$('form-error').textContent='Enter an amount with up to two decimal places, such as 12.50.';return;}const cents=Math.round(Number(raw)*100);if(cents<=0||cents>99999999999){$('form-error').textContent='Enter an amount greater than €0.00 and up to €999,999,999.99.';return;}
+  const category = $('purchase-category').value;
+  if (!categoryMap.has(category)) {
+    $('form-error').textContent = 'Choose a category.';
+    $('category-picker').firstElementChild?.focus();
+    return;
+  }
+  const date=$('purchase-date').value;if(!validDate(date)){$('form-error').textContent='Choose a valid date.';return;}const old=records.find(r=>r.id===editingId);const record={...(old?.merchant?{merchant:old.merchant}:{}),id:old?.id||(globalThis.crypto?.randomUUID?.()||`p-${Date.now()}-${Math.random().toString(36).slice(2)}`),cents,category,note:$('note').value.trim(),date,createdAt:old?.createdAt||Date.now()};const next=old?records.map(r=>r.id===old.id?record:r):[...records,record];const rememberPurchaseId=purchaseStorage&&old?.merchant&&$('remember-category').checked?record.id:null;if(!await persist(next,rememberPurchaseId)){$('form-error').textContent='The purchase could not be saved. Your existing records are unchanged.';return;}$('purchase-dialog').close();anchor=parseDate(date);render();notify(rememberPurchaseId?'Purchase updated. Category remembered for this vendor.':old?'Purchase updated.':'Purchase saved.');});
 for(const id of ['overview-tab','mobile-overview'])$(id).addEventListener('click',()=>showView('overview'));
 for(const id of ['history-tab','mobile-history'])$(id).addEventListener('click',()=>showView('history'));
 function movePeriod(direction){anchor=new Date(anchor.getFullYear(),anchor.getMonth()+direction,1,12);selectedChartCategory=null;render();}

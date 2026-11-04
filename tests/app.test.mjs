@@ -68,17 +68,21 @@ test('new tracker starts empty and lists all fourteen categories', async () => {
   assert.equal(a.node('total-spent').textContent, '€0.00');
   assert.equal((a.node('category-list').innerHTML.match(/class="category-row"/g) || []).length, 14);
 });
-test('legacy Bills purchases load and restore as Subscriptions', async () => {
+test('renamed categories migrate when purchases load or restore from backup', async () => {
   const bill = { id: 'old-bill', cents: 1250, category: 'Bills', note: 'Internet', date: '2026-10-13', createdAt: 1 };
-  const a = app(JSON.stringify([bill]));
+  const label = { id: 'old-label', cents: 500, category: 'Etsy (shipping labels)', note: 'Parcel', date: '2026-10-14', createdAt: 2 };
+  const a = app(JSON.stringify([bill, label]));
   assert.equal(a.run('records[0].category'), 'Subscriptions');
-  const backup = { app: 'pocket', version: 1, purchases: [{ ...bill, id: 'backup-bill' }] };
+  assert.equal(a.run('records[1].category'), 'Shipping Labels');
+  const backup = { app: 'pocket', version: 1, purchases: [{ ...bill, id: 'backup-bill' }, { ...label, id: 'backup-label' }] };
   const file = { size: 100, text: async () => JSON.stringify(backup) };
   await a.node('import-backup').handlers.change({ target: { files: [file], value: 'backup.json' } });
   const saved = JSON.parse(a.storage.get('pocket.purchases.v1'));
   assert.deepEqual(saved.map(({ id, category, cents }) => ({ id, category, cents })), [
     { id: 'old-bill', category: 'Subscriptions', cents: 1250 },
+    { id: 'old-label', category: 'Shipping Labels', cents: 500 },
     { id: 'backup-bill', category: 'Subscriptions', cents: 1250 },
+    { id: 'backup-label', category: 'Shipping Labels', cents: 500 },
   ]);
 });
 test('purchase entry accepts decimal comma, saves exact cents and survives reload', async () => {
@@ -87,6 +91,28 @@ test('purchase entry accepts decimal comma, saves exact cents and survives reloa
   assert.equal(a.node('total-spent').textContent, '€12.60');
   const b = app(a.storage.get('pocket.purchases.v1'));
   assert.equal(b.run('records.length'), 2);
+});
+test('opening a new purchase clears the previous category and requires an explicit choice', async () => {
+  const a = app();
+  const food = { ...a.node('food-option'), dataset: { category: 'Food' } };
+  a.node('category-picker').children = [food];
+  a.run("selectCategory('Food')");
+  assert.equal(food.attributes['aria-pressed'], true);
+
+  await a.run('document').handlers.click({
+    target: { closest: selector => selector === '[data-add]' ? {} : null },
+  });
+  assert.equal(a.node('purchase-dialog').open, true);
+  assert.equal(a.node('purchase-category').value, '');
+  assert.equal(food.attributes['aria-pressed'], false);
+  await a.submit('12.50', '');
+  assert.equal(a.node('form-error').textContent, 'Choose a category.');
+  assert.equal(a.run('records.length'), 0);
+
+  await a.submit('12.50', 'Food');
+  a.run('openPurchase(records[0])');
+  assert.equal(a.node('purchase-category').value, 'Food');
+  assert.equal(food.attributes['aria-pressed'], true);
 });
 test('category disclosures prefer monthly purchase notes and fall back to titles', () => {
   const a = app(JSON.stringify([
@@ -102,6 +128,24 @@ test('category disclosures prefer monthly purchase notes and fall back to titles
   const rows = [...food.matchAll(/<li>\s*<span>(.*?)<\/span>\s*<strong>(.*?)<\/strong>\s*<\/li>/g)];
   assert.deepEqual(rows.map(match => match.slice(1)), [['Food', '€2.00'], ['Bakery', '€4.25'], ['&lt;Lunch&gt;', '€12.50']]);
   assert.match(html, /<summary class="category-row">/);
+});
+test('overview categories reorder as monthly spending changes', async () => {
+  const a = app();
+  const order = () => [...a.node('category-list').innerHTML.matchAll(/data-category="([^"]+)"/g)]
+    .map(match => match[1]);
+
+  await a.submit('8.00', 'Food');
+  await a.submit('12.00', 'Transport');
+  assert.deepEqual(order().slice(0, 3), ['Transport', 'Food', 'House']);
+
+  await a.submit('4.00', 'Food');
+  assert.deepEqual(order().slice(0, 3), ['Transport', 'Food', 'House']);
+
+  await a.submit('0.01', 'Food');
+  assert.deepEqual(order().slice(0, 3), ['Food', 'Transport', 'House']);
+
+  a.node('previous-period').handlers.click();
+  assert.deepEqual(order().slice(0, 3), ['House', 'Investing', 'Paysera']);
 });
 test('chart slices show monthly category spending and can return to the total', async () => {
   const a = app();
@@ -331,14 +375,14 @@ test('vendor edits preserve identity and remember only with explicit consent', a
   };
   const a = app(null, false, null, purchases);
   await a.run('purchasesReady');
-  a.run('openPurchase("Food", records[0])');
+  a.run('openPurchase(records[0])');
   assert.equal(a.node('remember-category-option').hidden, false);
   assert.equal(a.node('remember-category').checked, false);
   a.node('remember-category').checked = true;
   await a.submit('3.50', 'Food', '2026-10-27', 'A different note');
   assert.equal(saved[0].merchant, 'ABC Shop');
   assert.equal(remembered, 'wallet-test');
-  a.run('openPurchase("Food", records[0])');
+  a.run('openPurchase(records[0])');
   assert.equal(a.node('remember-category').checked, false);
   await a.submit('3.50', 'House', '2026-10-27', 'Another note');
   assert.equal(remembered, null);

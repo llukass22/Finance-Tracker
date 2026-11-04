@@ -1,6 +1,6 @@
 # Pocket — local finance tracker
 
-A mobile-first EUR spending tracker with House, Investing, Paysera, Subscriptions, Car, Transport, Food, Eating Out, Drinks, Sports, Clothes, Gifts, Etsy (shipping labels), and Uncategorized. Runs as a web app or a standalone Android APK. No account or backend is needed.
+A mobile-first EUR spending tracker with House, Investing, Paysera, Subscriptions, Car, Transport, Food, Eating Out, Drinks, Sports, Clothes, Gifts, Shipping Labels, and Uncategorized. Runs as a web app or a standalone Android APK. No account or backend is needed.
 
 ## Android APK
 

@@ -42,8 +42,10 @@ h2 { font-size: 1.5rem; line-height: 1.35; }
 dialog label, .category-picker button, .toast { font-size: 1rem; }
 .chart-center strong { font-size: 2.25rem; line-height: 1.2; }
 #chart-selection-label { max-width: 65%; text-align: center; }
-.chart-slice { cursor: pointer; pointer-events: stroke; }
-.chart-slice[aria-pressed="true"], .chart-slice:focus-visible { stroke-width: 34; }
+#spending-chart { -webkit-tap-highlight-color: transparent; }
+.chart-slice { cursor: pointer; pointer-events: stroke; outline: none; }
+.chart-slice[aria-pressed="true"] { stroke-width: 34; }
+.chart-slice:focus-visible { stroke-width: 34; filter: drop-shadow(0 0 2px var(--ink)); }
 .amount-input { font-size: 1.875rem; }
 .amount-input input { font-size: 2.25rem; }
 .icon-button { width: 44px; height: 44px; flex-shrink: 0; }
@@ -65,7 +67,11 @@ input, select, .primary-button, .secondary-button { min-height: 48px; }
   border-width: 0 2px 2px 0;
   transform: translateY(-2px) rotate(45deg);
 }
-.category-details[open] > .category-row::after { transform: translateY(2px) rotate(225deg); }
+.category-details[open]:not([data-closing]) > .category-row::after { transform: translateY(2px) rotate(225deg); }
+.category-content { display: flow-root; overflow: hidden; }
+@media (prefers-reduced-motion: no-preference) {
+  .category-row::after { transition: transform 180ms ease-out; }
+}
 .category-purchases { list-style: none; margin: 0 0 12px; padding: 4px 12px; border-radius: 10px; background: var(--soft); }
 .category-purchases li { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; }
 .category-purchases span { min-width: 0; overflow-wrap: anywhere; }

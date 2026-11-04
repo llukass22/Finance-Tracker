@@ -20,10 +20,10 @@ import java.util.Set;
 public final class PurchaseDatabase extends SQLiteOpenHelper {
     private static final Set<String> CATEGORIES = new HashSet<>(Arrays.asList(
         "Car", "House", "Investing", "Paysera", "Eating Out", "Food", "Drinks", "Subscriptions",
-        "Sports", "Clothes", "Etsy (shipping labels)", "Gifts", "Transport", "Uncategorized"));
+        "Sports", "Clothes", "Shipping Labels", "Gifts", "Transport", "Uncategorized"));
 
     public PurchaseDatabase(Context context) { this(context, "pocket-purchases.db"); }
-    PurchaseDatabase(Context context, String name) { super(context, name, null, 4); }
+    PurchaseDatabase(Context context, String name) { super(context, name, null, 5); }
 
     @Override public void onCreate(SQLiteDatabase db) {
         db.execSQL("CREATE TABLE purchases (id TEXT PRIMARY KEY NOT NULL, cents INTEGER NOT NULL CHECK(cents > 0 AND cents <= 99999999999), category TEXT NOT NULL, note TEXT NOT NULL, date TEXT NOT NULL, createdAt INTEGER NOT NULL CHECK(createdAt >= 0))");
@@ -38,6 +38,10 @@ public final class PurchaseDatabase extends SQLiteOpenHelper {
         if (oldVersion < 4) {
             db.execSQL("UPDATE purchases SET category = 'Subscriptions' WHERE category = 'Bills'");
             db.execSQL("UPDATE merchant_categories SET category = 'Subscriptions' WHERE category = 'Bills'");
+        }
+        if (oldVersion < 5) {
+            db.execSQL("UPDATE purchases SET category = 'Shipping Labels' WHERE category = 'Etsy (shipping labels)'");
+            db.execSQL("UPDATE merchant_categories SET category = 'Shipping Labels' WHERE category = 'Etsy (shipping labels)'");
         }
     }
 
