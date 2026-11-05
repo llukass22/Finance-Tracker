@@ -32,7 +32,6 @@ h2 { font-size: 1.5rem; line-height: 1.35; }
   font-size: .875rem; line-height: 1.5; letter-spacing: .08em;
 }
 .local-label, .small, .tabs button span,
-.chart-center > span, .chart-center > span:last-child,
 .chart-footer p, .category-percent,
 .purchase-copy p, .empty-state p,
 .history-group, .form-error { font-size: .875rem; }
@@ -40,8 +39,14 @@ h2 { font-size: 1.5rem; line-height: 1.35; }
 .category-name, .category-amount, .text-button,
 .purchase-copy strong, .purchase-sum, .empty-state strong,
 dialog label, .category-picker button, .toast { font-size: 1rem; }
-.chart-center strong { font-size: 2.25rem; line-height: 1.2; }
+.chart-center strong { font-size: 1.75rem; line-height: 1.25; }
+#total-income { color: #23855a; }
+#total-spent { color: #c34444; }
+[data-theme="dark"] #total-income { color: #7dcc9e; }
+[data-theme="dark"] #total-spent { color: #f19595; }
+#chart-selection-label, #purchase-count { font-size: .875rem; }
 #chart-selection-label { max-width: 65%; text-align: center; }
+#total-income[hidden] ~ #total-spent { color: var(--ink); font-size: 2.25rem; }
 #spending-chart { -webkit-tap-highlight-color: transparent; }
 .chart-slice { cursor: pointer; pointer-events: stroke; outline: none; }
 .chart-slice[aria-pressed="true"] { stroke-width: 34; }
@@ -113,7 +118,7 @@ input, select, .primary-button, .secondary-button { min-height: 48px; }
   .chart-card, .categories-card, .history-card { padding: 20px 16px; }
   .chart-wrap { width: min(280px, 100%); height: auto; aspect-ratio: 1; margin: 24px auto; }
   .chart-center { gap: 6px; }
-  .chart-center strong { font-size: 2.25rem; max-width: 65%; }
+  .chart-center strong { max-width: 65%; }
   .category-row { gap: 8px; padding: 12px 0; }
   .category-name, .category-amount, .purchase-sum { font-size: 1rem; }
   .category-icon { width: 40px; height: 40px; }

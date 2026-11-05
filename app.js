@@ -118,22 +118,32 @@ function empty(message,detail,add=false){return `<div class="empty-state"><span 
 function purchaseRow(r){const c=categoryMap.get(r.category);return `<div class="purchase-row">${categoryIcon(c)}<div class="purchase-copy"><strong>${escapeHTML(r.note||r.category)}</strong><p>${r.category} · ${parseDate(r.date).toLocaleDateString('en-GB',{day:'numeric',month:'short'})}</p></div><span class="purchase-sum">${isIncome(r) ? "+" : ""}${money(r.cents)}</span><div class="purchase-actions"><button data-edit="${escapeHTML(r.id)}" aria-label="Edit ${escapeHTML(r.note||r.category)}" title="Edit purchase">${icon('edit')}</button><button data-delete="${escapeHTML(r.id)}" aria-label="Delete ${escapeHTML(r.note||r.category)}" title="Delete purchase">${icon('trash')}</button></div></div>`;}
 function renderHistory(list){const cat=$('category-filter').value;const visible=list.filter(r=>cat==='all'||r.category===cat);let lastDate='';$('history-list').innerHTML=visible.length?visible.map(r=>{let heading='';if(r.date!==lastDate){heading=`<p class="history-group">${parseDate(r.date).toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}</p>`;lastDate=r.date;}return heading+purchaseRow(r);}).join(''):empty('No entries found',cat!=='all'?'Try another category.':'Entries in this period will appear here.',!records.length);}
 let selectedChartCategory = null;
+let chartCenterAnimation = null;
 
 function renderChartCenter(purchases) {
+  const income = purchases.filter(isIncome).reduce((sum, purchase) => sum + purchase.cents, 0);
   const expenses = purchases.filter(purchase => !isIncome(purchase));
   const visible = selectedChartCategory
     ? expenses.filter(purchase => purchase.category === selectedChartCategory)
     : expenses;
   const cents = visible.reduce((sum, purchase) => sum + purchase.cents, 0);
-  $('chart-selection-label').textContent = selectedChartCategory || 'Total spent';
+  const showingCategory = selectedChartCategory !== null;
+  $('chart-selection-label').textContent = selectedChartCategory || '';
+  $('chart-selection-label').hidden = !showingCategory;
+  $('purchase-count').textContent = `${visible.length} expense${visible.length === 1 ? '' : 's'}`;
+  $('total-income').hidden = showingCategory;
+  $('total-income').textContent = money(income);
+  $('total-income').setAttribute('aria-label', `Income ${money(income)}`);
   $('total-spent').textContent = money(cents);
-  $('purchase-count').textContent = `${visible.length} purchase${visible.length === 1 ? '' : 's'}`;
+  $('total-spent').setAttribute('aria-label', `${selectedChartCategory || 'Expenses'} ${money(cents)}`);
 }
 
 function renderChart(purchases, totals, total) {
   const chart = $('spending-chart');
   const slices = totals.filter(category => category.cents > 0);
   if (!slices.some(category => category.name === selectedChartCategory)) selectedChartCategory = null;
+  chartCenterAnimation?.cancel();
+  chartCenterAnimation = null;
   renderChartCenter(purchases);
 
   const radius = 116;
@@ -155,6 +165,35 @@ function renderChart(purchases, totals, total) {
   chart.setAttribute('aria-label', total ? `Spending by category. Total ${money(total)}.` : 'No purchases in this period');
 }
 
+function animateChartCenter() {
+  const center = $('chart-center');
+  if (!center.animate || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    chartCenterAnimation?.cancel();
+    chartCenterAnimation = null;
+    renderChartCenter(filtered());
+    return;
+  }
+
+  const offset = selectedChartCategory === null ? -4 : 4;
+  const style = getComputedStyle(center);
+  const start = { opacity: style.opacity, transform: style.transform };
+  chartCenterAnimation?.cancel();
+  const fadeOut = center.animate([
+    start,
+    { opacity: 0, transform: `translateY(${-offset}px)` },
+  ], { duration: 70, easing: 'ease-in', fill: 'forwards' });
+  chartCenterAnimation = fadeOut;
+  fadeOut.onfinish = () => {
+    if (chartCenterAnimation !== fadeOut) return;
+    renderChartCenter(filtered());
+    fadeOut.cancel();
+    chartCenterAnimation = center.animate([
+      { opacity: 0, transform: `translateY(${offset}px)` },
+      { opacity: 1, transform: 'translateY(0)' },
+    ], { duration: 110, easing: 'ease-out' });
+  };
+}
+
 function updateChartSelection(name) {
   const next = selectedChartCategory === name ? null : name;
   if (next === selectedChartCategory) return;
@@ -162,7 +201,7 @@ function updateChartSelection(name) {
   for (const button of $('spending-chart').querySelectorAll('[data-chart-category]')) {
     button.setAttribute('aria-pressed', String(button.dataset.chartCategory === selectedChartCategory));
   }
-  renderChartCenter(filtered());
+  animateChartCenter();
 }
 
 $('chart-card').addEventListener('click', event => {
@@ -255,7 +294,7 @@ function render() {
   const incomeTotal = income.reduce((sum, purchase) => sum + purchase.cents, 0);
   const totals = categoryTotals(categories, expenses);
   $('history-count').textContent = list.length;
-  renderChart(expenses, totals, total);
+  renderChart(list, totals, total);
   renderCategories(totals, total);
   renderCategories(categoryTotals(incomeCategories, income), incomeTotal, 'income-list');
   const top = totals.reduce((highest, category) => category.cents > highest.cents ? category : highest, totals[0]);
@@ -272,7 +311,7 @@ function openPurchase(record = null, income = false) {
   $('purchase-form').reset();
   $('form-title').textContent = incomeEntry
     ? (record ? 'Edit income' : 'Add income')
-    : (record ? 'Edit purchase' : 'Add a purchase');
+    : (record ? 'Edit purchase' : 'Add expense');
   $('save-entry').innerHTML = incomeEntry ? 'Save income <span>↗</span>' : 'Save purchase <span>↗</span>';
   $('amount').value = record ? (record.cents / 100).toFixed(2) : '';
   $('note').value = record?.note || '';

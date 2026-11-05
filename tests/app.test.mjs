@@ -162,7 +162,7 @@ test('income entries save separately from spending and support history, edits an
   await a.submit('50', 'Other', '2026-10-13', 'Sold a bookcase');
   await a.submit('12.50', 'Food', '2026-10-13', 'Lunch');
   assert.equal(a.node('total-spent').textContent, '€12.50');
-  assert.equal(a.node('purchase-count').textContent, '1 purchase');
+  assert.equal(a.node('total-income').textContent, '€2,050.00');
   assert.match(a.node('income-list').innerHTML, /October salary/);
   assert.match(a.node('income-list').innerHTML, /\+€2,000\.00/);
   assert.doesNotMatch(a.node('category-list').innerHTML, /October salary|Sold a bookcase/);
@@ -176,10 +176,12 @@ test('income entries save separately from spending and support history, edits an
   assert.equal(a.node('form-title').textContent, 'Edit income');
   await a.submit('2100', 'Salary', '2026-10-13', 'Updated salary');
   assert.equal(a.node('total-spent').textContent, '€12.50');
+  assert.equal(a.node('total-income').textContent, '€2,150.00');
 
   const restored = app(a.storage.get('pocket.purchases.v1'));
   restored.run("anchor=parseDate('2026-10-13'); render()");
   assert.equal(restored.node('total-spent').textContent, '€12.50');
+  assert.equal(restored.node('total-income').textContent, '€2,150.00');
   assert.match(restored.node('income-list').innerHTML, /Updated salary/);
 
   let csv;
@@ -194,6 +196,7 @@ test('chart slices show monthly category spending and can return to the total', 
   await a.submit('7.50', 'Transport');
   await a.submit('3.00', 'Food', '2026-09-13');
   await a.submit('2.50', 'Food');
+  await a.submit('2000', 'Salary');
 
   const chart = a.node('spending-chart');
   const click = target => a.node('chart-card').handlers.click({ target });
@@ -206,18 +209,28 @@ test('chart slices show monthly category spending and can return to the total', 
   const food = slice('Food'), transport = slice('Transport');
   chart.querySelectorAll = () => [food, transport];
   click(food);
+  assert.equal(a.node('chart-selection-label').hidden, false);
   assert.equal(a.node('chart-selection-label').textContent, 'Food');
+  assert.equal(a.node('purchase-count').hidden, false);
+  assert.equal(a.node('purchase-count').textContent, '2 expenses');
+  assert.equal(a.node('total-income').hidden, true);
+  assert.equal(a.node('total-spent').attributes['aria-label'], 'Food €15.00');
   assert.equal(a.node('total-spent').textContent, '€15.00');
-  assert.equal(a.node('purchase-count').textContent, '2 purchases');
   assert.equal(food.attributes['aria-pressed'], 'true');
 
   chart.handlers.keydown({ target: transport, key: 'Enter', preventDefault() {} });
-  assert.equal(a.node('chart-selection-label').textContent, 'Transport');
+  assert.equal(a.node('total-spent').attributes['aria-label'], 'Transport €7.50');
   assert.equal(a.node('total-spent').textContent, '€7.50');
+  assert.equal(a.node('chart-selection-label').textContent, 'Transport');
+  assert.equal(a.node('purchase-count').textContent, '1 expense');
   assert.equal(food.attributes['aria-pressed'], 'false');
   click({ closest: () => null });
-  assert.equal(a.node('chart-selection-label').textContent, 'Total spent');
+  assert.equal(a.node('total-spent').attributes['aria-label'], 'Expenses €22.50');
   assert.equal(a.node('total-spent').textContent, '€22.50');
+  assert.equal(a.node('chart-selection-label').hidden, true);
+  assert.equal(a.node('purchase-count').textContent, '3 expenses');
+  assert.equal(a.node('total-income').hidden, false);
+  assert.equal(a.node('total-income').textContent, '€2,000.00');
   assert.equal(transport.attributes['aria-pressed'], 'false');
 
   click(food);
@@ -225,8 +238,34 @@ test('chart slices show monthly category spending and can return to the total', 
   assert.equal(a.node('total-spent').textContent, '€22.50');
   click(food);
   a.node('previous-period').handlers.click();
-  assert.equal(a.node('chart-selection-label').textContent, 'Total spent');
+  assert.equal(a.node('total-spent').attributes['aria-label'], 'Expenses €3.00');
   assert.equal(a.node('total-spent').textContent, '€3.00');
+});
+test('rapid chart selections and month changes cancel outdated text transitions', async () => {
+  const a = app();
+  await a.submit('12.50', 'Food');
+  await a.submit('7.50', 'Transport');
+  a.run("window.matchMedia = () => ({ matches: false }); globalThis.getComputedStyle = () => ({ opacity: '1', transform: 'none' });");
+  let animation;
+  a.node('chart-center').animate = () => animation = { cancel() { this.canceled = true; } };
+
+  a.run("updateChartSelection('Food')");
+  const first = animation;
+  a.run("updateChartSelection('Transport')");
+  assert.equal(first.canceled, true);
+  first.onfinish();
+  assert.equal(a.node('total-spent').textContent, '€20.00');
+  animation.onfinish();
+  assert.equal(a.node('chart-selection-label').textContent, 'Transport');
+  assert.equal(a.node('total-spent').textContent, '€7.50');
+
+  a.run('updateChartSelection(null)');
+  const clearing = animation;
+  a.node('previous-period').handlers.click();
+  assert.equal(clearing.canceled, true);
+  clearing.onfinish();
+  assert.equal(a.node('total-spent').textContent, '€0.00');
+  assert.equal(a.node('chart-selection-label').hidden, true);
 });
 test('invalid amounts and impossible dates never save', async () => {
   const a = app(); for (const value of ['0','-1','1.234','abc','1e3']) await a.submit(value);
