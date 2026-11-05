@@ -17,6 +17,40 @@ public class WalletNotificationRouterTest {
         }
     }
 
+    @Test public void payseraVisaCardIsExcludedFromEveryWalletTextField() {
+        for (String source : new String[]{"com.google.android.apps.walletnfcrel", "com.google.android.gms"}) {
+            for (int field = 0; field < 4; field++) {
+                String[] fields = {"Shop", "€3.50 with SEB Debit Mastercard", null, null};
+                fields[field] = (fields[field] == null ? "" : fields[field] + " ") + "Paysera Visa Card";
+                PurchaseNotificationParser.Result parsed = WalletNotificationRouter.parse(
+                    source, false, fields[0], fields[1], fields[2], fields[3]);
+                assertEquals(source + " field " + field, "ignored", parsed.status);
+                assertEquals("excluded_paysera_card", parsed.reason);
+                assertNull(NotificationPurchase.from(parsed, "wallet-key", 1792400000000L));
+            }
+        }
+    }
+
+    @Test public void payseraExclusionHandlesCaseSpacingAndExpandedBody() {
+        PurchaseNotificationParser.Result parsed = WalletNotificationRouter.parse(
+            "com.google.android.apps.walletnfcrel", false, "Shop", "€3.50",
+            "€3.50 with \u2066pAySeRa\u00a0VISA\u202f\nCard\u2069", null);
+        assertEquals("ignored", parsed.status);
+        assertEquals("excluded_paysera_card", parsed.reason);
+        assertNull(NotificationPurchase.from(parsed, "wallet-key", 1792400000000L));
+    }
+
+    @Test public void otherCardsAndPayseraMerchantNamesStillImport() {
+        for (String[] fields : new String[][]{
+                {"Shop", "€3.50 with SEB Debit Mastercard"},
+                {"Paysera", "€3.50 with SEB Debit Mastercard"},
+                {"Shop", "€3.50 with Visa Card"}}) {
+            PurchaseNotificationParser.Result parsed = WalletNotificationRouter.parse(
+                "com.google.android.apps.walletnfcrel", false, fields[0], fields[1], null, null);
+            assertNotNull(NotificationPurchase.from(parsed, "wallet-key", 1792400000000L));
+        }
+    }
+
     @Test public void unrelatedAppsAndGroupSummariesAreNotParsed() {
         assertNull(route("com.google.android.gm", false));
         assertNull(route("com.pocket.financetracker", false));

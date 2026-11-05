@@ -16,6 +16,7 @@ public final class PurchaseNotificationParser {
     private static final String UNIT = "(?:€|£|₽|\\$|(?<![A-Za-z])(?:" + CODE + ")(?![A-Za-z]))";
     private static final String NUMBER = "[0-9]+(?:[., ][0-9]+)*";
     private static final Pattern MONEY = Pattern.compile("(" + UNIT + ")\\s*([+-]?" + NUMBER + ")|([+-]?" + NUMBER + ")\\s*(" + UNIT + ")", Pattern.CASE_INSENSITIVE);
+    private static final Pattern EXCLUDED_CARD = Pattern.compile("\\bPaysera\\s+Visa\\s+Card\\b", Pattern.CASE_INSENSITIVE);
     private static final Pattern NON_PURCHASE = Pattern.compile("\\b(declined|failed|cancelled|canceled|refunded?|refunds|reversed|reversal|cashback|verification|one.time (?:code|password)|OTP)\\b", Pattern.CASE_INSENSITIVE);
     private static final Pattern UNCERTAIN = Pattern.compile("\\b(pending|pre.?authori[sz](?:ation|ed)|hold|balance|available)\\b", Pattern.CASE_INSENSITIVE);
     private static final Pattern AT_MERCHANT = Pattern.compile("(?:^|\\b)(?:at|to)\\s+(.+)$", Pattern.CASE_INSENSITIVE);
@@ -153,6 +154,7 @@ public final class PurchaseNotificationParser {
         List<String> fields = new ArrayList<>(unique);
         if (fields.isEmpty()) return review("missing_text");
         String all = String.join("\n", fields);
+        if (EXCLUDED_CARD.matcher(all).find()) return new Result("ignored", "excluded_paysera_card", null, null, null);
         if (NON_PURCHASE.matcher(all).find()) return new Result("ignored", "non_purchase_message", null, null, null);
         if (UNCERTAIN.matcher(all).find()) return review("uncertain_transaction");
 
