@@ -4,6 +4,8 @@ const paths = {
 car:'<path d="m5 7 2-4h10l2 4M5 7h14a2 2 0 0 1 2 2v7H3V9a2 2 0 0 1 2-2ZM5 16v3m14-3v3M6 11h2m8 0h2"/>',
 house:'<path d="m3 10 9-7 9 7M5 9v12h14V9M9 21v-8h6v8"/>',
 wallet:'<path d="M20 7H5a2 2 0 0 1 0-4h13v4M4 7v13h17V7m0 4h-6v5h6m-4-3h.01"/>',
+salary:'<rect x="3" y="7" width="18" height="14" rx="2"/><path d="M8 7V3h8v4M3 12a20 20 0 0 0 18 0M12 11v4"/>',
+income:'<path d="M12 3v12m-4-4 4 4 4-4M4 16v5h16v-5"/>',
 investing:'<path d="M3 3v18h18M7 15l5-5 4 3 5-6m-5 0h5v5"/>',
 food:'<path d="M5 3v7m3-7v7m-6-7v7c0 3 6 3 6 0M5 13v8M16 3c-4 3-4 10 0 10h2V3Zm2 10v8"/>',
 basket:'<path d="m8 3-4 7m12-7 4 7M2 10h20l-3 11H5Zm6 4v3m4-3v3m4-3v3"/>',
@@ -39,7 +41,14 @@ const categories = [
 {name:'Shipping Labels', color:'#e68b59', tint:'#fcf0e7', icon:'shipping'},
 {name:'Uncategorized', color:'#a0a7b4', tint:'#eef0f4', icon:'uncategorized'}
 ];
-const categoryMap = new Map(categories.map(c => [c.name,c]));
+const incomeCategories = [
+  { name: 'Salary', color: '#63b58d', tint: '#e8f6ee', icon: 'salary' },
+  { name: 'Other', color: '#72b7c2', tint: '#e8f4f6', icon: 'income' },
+];
+const allCategories = [...incomeCategories, ...categories];
+const incomeCategoryNames = new Set(incomeCategories.map(category => category.name));
+const isIncome = record => incomeCategoryNames.has(record.category);
+const categoryMap = new Map(allCategories.map(category => [category.name, category]));
 const STORAGE_KEY = 'pocket.purchases.v1';
 const THEME_KEY = 'pocket.theme.v1';
 function applyTheme(theme){
@@ -106,14 +115,15 @@ function filtered(){const b=bounds();return records.filter(r=>r.date>=b.start&&r
 function periodLabel(){$('period-label').textContent=anchor.toLocaleDateString('en-GB',{month:'long',year:'numeric'});}
 function categoryIcon(c){return `<span class="category-icon" style="--color:${c.color};--tint:${c.tint}">${icon(c.icon)}</span>`;}
 function empty(message,detail,add=false){return `<div class="empty-state"><span class="empty-symbol">✧</span><strong>${message}</strong><p>${detail}</p>${add?'<button class="text-button" data-add>Add your first purchase ↗</button>':''}</div>`;}
-function purchaseRow(r){const c=categoryMap.get(r.category);return `<div class="purchase-row">${categoryIcon(c)}<div class="purchase-copy"><strong>${escapeHTML(r.note||r.category)}</strong><p>${r.category} · ${parseDate(r.date).toLocaleDateString('en-GB',{day:'numeric',month:'short'})}</p></div><span class="purchase-sum">${money(r.cents)}</span><div class="purchase-actions"><button data-edit="${escapeHTML(r.id)}" aria-label="Edit ${escapeHTML(r.note||r.category)}" title="Edit purchase">${icon('edit')}</button><button data-delete="${escapeHTML(r.id)}" aria-label="Delete ${escapeHTML(r.note||r.category)}" title="Delete purchase">${icon('trash')}</button></div></div>`;}
-function renderHistory(list){const cat=$('category-filter').value;const visible=list.filter(r=>cat==='all'||r.category===cat);let lastDate='';$('history-list').innerHTML=visible.length?visible.map(r=>{let heading='';if(r.date!==lastDate){heading=`<p class="history-group">${parseDate(r.date).toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}</p>`;lastDate=r.date;}return heading+purchaseRow(r);}).join(''):empty('No purchases found',cat!=='all'?'Try another category.':'Purchases in this period will appear here.',!records.length);}
+function purchaseRow(r){const c=categoryMap.get(r.category);return `<div class="purchase-row">${categoryIcon(c)}<div class="purchase-copy"><strong>${escapeHTML(r.note||r.category)}</strong><p>${r.category} · ${parseDate(r.date).toLocaleDateString('en-GB',{day:'numeric',month:'short'})}</p></div><span class="purchase-sum">${isIncome(r) ? "+" : ""}${money(r.cents)}</span><div class="purchase-actions"><button data-edit="${escapeHTML(r.id)}" aria-label="Edit ${escapeHTML(r.note||r.category)}" title="Edit purchase">${icon('edit')}</button><button data-delete="${escapeHTML(r.id)}" aria-label="Delete ${escapeHTML(r.note||r.category)}" title="Delete purchase">${icon('trash')}</button></div></div>`;}
+function renderHistory(list){const cat=$('category-filter').value;const visible=list.filter(r=>cat==='all'||r.category===cat);let lastDate='';$('history-list').innerHTML=visible.length?visible.map(r=>{let heading='';if(r.date!==lastDate){heading=`<p class="history-group">${parseDate(r.date).toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}</p>`;lastDate=r.date;}return heading+purchaseRow(r);}).join(''):empty('No entries found',cat!=='all'?'Try another category.':'Entries in this period will appear here.',!records.length);}
 let selectedChartCategory = null;
 
 function renderChartCenter(purchases) {
+  const expenses = purchases.filter(purchase => !isIncome(purchase));
   const visible = selectedChartCategory
-    ? purchases.filter(purchase => purchase.category === selectedChartCategory)
-    : purchases;
+    ? expenses.filter(purchase => purchase.category === selectedChartCategory)
+    : expenses;
   const cents = visible.reduce((sum, purchase) => sum + purchase.cents, 0);
   $('chart-selection-label').textContent = selectedChartCategory || 'Total spent';
   $('total-spent').textContent = money(cents);
@@ -169,7 +179,7 @@ $('spending-chart').addEventListener('keydown', event => {
 
 const categoryAnimations = new WeakMap();
 
-$('category-list').addEventListener('click', event => {
+function toggleCategory(event) {
   const summary = event.target.closest('.category-row');
   if (!summary || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
 
@@ -200,17 +210,18 @@ $('category-list').addEventListener('click', event => {
     categoryAnimations.delete(details);
     animation.cancel();
   };
-});
+}
+for (const id of ['category-list', 'income-list']) $(id).addEventListener('click', toggleCategory);
 
-function renderCategories(totals, total) {
-  const list = $('category-list');
+function renderCategories(totals, total, listId = 'category-list') {
+  const list = $(listId);
   const expanded = new Set([...list.querySelectorAll('details[open]:not([data-closing])')].map(row => row.dataset.category));
   const ranked = [...totals].sort((a, b) => b.cents - a.cents);
   list.innerHTML = ranked.map(category => {
     const purchases = category.purchases.map(purchase => `
       <li>
         <span>${escapeHTML(purchase.note.trim() || purchase.merchant?.trim() || purchase.category)}</span>
-        <strong>${money(purchase.cents)}</strong>
+        <strong>${isIncome(purchase) ? '+' : ''}${money(purchase.cents)}</strong>
       </li>`).join('');
     return `
       <details class="category-details" data-category="${category.name}"${expanded.has(category.name) ? ' open' : ''}>
@@ -221,24 +232,32 @@ function renderCategories(totals, total) {
           <span class="category-percent">${total ? Math.round(category.cents / total * 100) : 0}%</span>
         </summary>
         <div class="category-content">
-          ${purchases ? `<ul class="category-purchases" role="list">${purchases}</ul>` : '<p class="category-empty">No purchases this month.</p>'}
+          ${purchases ? `<ul class="category-purchases" role="list">${purchases}</ul>` : `<p class="category-empty">${listId === 'income-list' ? 'No income this month.' : 'No purchases this month.'}</p>`}
         </div>
       </details>`;
   }).join('');
 }
 
-function render() {
-  periodLabel();
-  const list = filtered();
-  const total = list.reduce((sum, purchase) => sum + purchase.cents, 0);
-  const totals = categories.map(category => {
+function categoryTotals(definitions, list) {
+  return definitions.map(category => {
     const purchases = list.filter(purchase => purchase.category === category.name);
     const cents = purchases.reduce((sum, purchase) => sum + purchase.cents, 0);
     return { ...category, cents, purchases };
   });
+}
+
+function render() {
+  periodLabel();
+  const list = filtered();
+  const expenses = list.filter(purchase => !isIncome(purchase));
+  const income = list.filter(isIncome);
+  const total = expenses.reduce((sum, purchase) => sum + purchase.cents, 0);
+  const incomeTotal = income.reduce((sum, purchase) => sum + purchase.cents, 0);
+  const totals = categoryTotals(categories, expenses);
   $('history-count').textContent = list.length;
-  renderChart(list, totals, total);
+  renderChart(expenses, totals, total);
   renderCategories(totals, total);
+  renderCategories(categoryTotals(incomeCategories, income), incomeTotal, 'income-list');
   const top = totals.reduce((highest, category) => category.cents > highest.cents ? category : highest, totals[0]);
   $('chart-insight').textContent = total
     ? `${top.name} makes up ${Math.round(top.cents / total * 100)}% of your spending.`
@@ -247,17 +266,39 @@ function render() {
 }
 function showView(view){const overview=view==='overview';$('overview').hidden=!overview;$('history').hidden=overview;for(const [id,on] of [['overview-tab',overview],['history-tab',!overview],['mobile-overview',overview],['mobile-history',!overview]]){$(id).classList.toggle('active',on);if(id.endsWith('-tab'))$(id).setAttribute('aria-selected',on);}if(!overview)renderHistory(filtered());}
 function selectCategory(name){$('purchase-category').value=name;for(const button of $('category-picker').children){const on=button.dataset.category===name;button.classList.toggle('active',on);button.setAttribute('aria-pressed',on);}}
-function openPurchase(record=null){editingId=record?.id||null;$('purchase-form').reset();$('form-title').textContent=record?'Edit purchase':'Add a purchase';$('amount').value=record?(record.cents/100).toFixed(2):'';$('note').value=record?.note||'';$('purchase-date').value=record?.date||localDate();$('form-error').textContent='';$('remember-category').checked=false;$('remember-category-option').hidden=!(purchaseStorage&&record?.merchant&&record.merchant.normalize('NFD').replace(/[\u0300-\u036f]/g,'').match(/[\p{L}\p{N}]/u));$('remember-vendor').textContent=record?.merchant||'';selectCategory(record?.category||'');$('purchase-dialog').showModal();setTimeout(()=>$('amount').focus(),50);}
+function openPurchase(record = null, income = false) {
+  const incomeEntry = record ? isIncome(record) : income;
+  editingId = record?.id || null;
+  $('purchase-form').reset();
+  $('form-title').textContent = incomeEntry
+    ? (record ? 'Edit income' : 'Add income')
+    : (record ? 'Edit purchase' : 'Add a purchase');
+  $('save-entry').innerHTML = incomeEntry ? 'Save income <span>↗</span>' : 'Save purchase <span>↗</span>';
+  $('amount').value = record ? (record.cents / 100).toFixed(2) : '';
+  $('note').value = record?.note || '';
+  $('purchase-date').value = record?.date || localDate();
+  $('form-error').textContent = '';
+  $('remember-category').checked = false;
+  $('remember-category-option').hidden = !(purchaseStorage && record?.merchant && record.merchant.normalize('NFD').replace(/[\u0300-\u036f]/g, '').match(/[\p{L}\p{N}]/u));
+  $('remember-vendor').textContent = record?.merchant || '';
+  renderCategoryPicker(incomeEntry ? incomeCategories : categories);
+  selectCategory(record?.category || '');
+  $('purchase-dialog').showModal();
+  setTimeout(() => $('amount').focus(), 50);
+}
 $('backup-button').innerHTML=icon('backup');
 $('settings-button').innerHTML=icon('settings');
 $('settings-button').addEventListener('click',()=>$('settings-dialog').showModal());
-for(const c of categories){$('purchase-category').add(new Option(c.name,c.name));$('category-filter').add(new Option(c.name,c.name));}
-$('category-picker').innerHTML = categories.map(category => `
-  <button type="button" data-category="${category.name}" style="--color:${category.color}" aria-pressed="false">
-    ${icon(category.icon)}<span>${category.name}</span>
-  </button>`).join('');
+for(const c of allCategories){$('purchase-category').add(new Option(c.name,c.name));$('category-filter').add(new Option(c.name,c.name));}
+function renderCategoryPicker(definitions) {
+  $('category-picker').innerHTML = definitions.map(category => `
+    <button type="button" data-category="${category.name}" style="--color:${category.color}" aria-pressed="false">
+      ${icon(category.icon)}<span>${category.name}</span>
+    </button>`).join('');
+}
+renderCategoryPicker(categories);
 $('category-picker').addEventListener('click',e=>{const b=e.target.closest('[data-category]');if(b)selectCategory(b.dataset.category);});
-document.addEventListener('click',async e=>{const add=e.target.closest('[data-add]');if(add){openPurchase();return;}const edit=e.target.closest('[data-edit]');if(edit){const r=records.find(r=>r.id===edit.dataset.edit);if(r)openPurchase(r);return;}const del=e.target.closest('[data-delete]');if(del){const r=records.find(r=>r.id===del.dataset.delete);if(r&&await persist(records.filter(x=>x.id!==r.id))){deletedRecord=r;render();notify('Purchase deleted.',true);}}if(e.target.closest('.close-dialog'))e.target.closest('dialog').close();});
+document.addEventListener('click',async e=>{const incomeAdd=e.target.closest('[data-add-income]');if(incomeAdd){openPurchase(null,true);return;}const add=e.target.closest('[data-add]');if(add){openPurchase();return;}const edit=e.target.closest('[data-edit]');if(edit){const r=records.find(r=>r.id===edit.dataset.edit);if(r)openPurchase(r);return;}const del=e.target.closest('[data-delete]');if(del){const r=records.find(r=>r.id===del.dataset.delete);if(r&&await persist(records.filter(x=>x.id!==r.id))){deletedRecord=r;render();notify('Purchase deleted.',true);}}if(e.target.closest('.close-dialog'))e.target.closest('dialog').close();});
 $('undo-delete').addEventListener('click',async()=>{if(deletedRecord&&await persist([...records,deletedRecord])){deletedRecord=null;render();notify('Purchase restored.');}});
 $('purchase-form').addEventListener('submit',async e=>{e.preventDefault();const raw=$('amount').value.trim().replace(',','.');if(!/^\d{1,9}(\.\d{1,2})?$/.test(raw)){$('form-error').textContent='Enter an amount with up to two decimal places, such as 12.50.';return;}const cents=Math.round(Number(raw)*100);if(cents<=0||cents>99999999999){$('form-error').textContent='Enter an amount greater than €0.00 and up to €999,999,999.99.';return;}
   const category = $('purchase-category').value;
@@ -266,14 +307,14 @@ $('purchase-form').addEventListener('submit',async e=>{e.preventDefault();const 
     $('category-picker').firstElementChild?.focus();
     return;
   }
-  const date=$('purchase-date').value;if(!validDate(date)){$('form-error').textContent='Choose a valid date.';return;}const old=records.find(r=>r.id===editingId);const record={...(old?.merchant?{merchant:old.merchant}:{}),id:old?.id||(globalThis.crypto?.randomUUID?.()||`p-${Date.now()}-${Math.random().toString(36).slice(2)}`),cents,category,note:$('note').value.trim(),date,createdAt:old?.createdAt||Date.now()};const next=old?records.map(r=>r.id===old.id?record:r):[...records,record];const rememberPurchaseId=purchaseStorage&&old?.merchant&&$('remember-category').checked?record.id:null;if(!await persist(next,rememberPurchaseId)){$('form-error').textContent='The purchase could not be saved. Your existing records are unchanged.';return;}$('purchase-dialog').close();anchor=parseDate(date);render();notify(rememberPurchaseId?'Purchase updated. Category remembered for this vendor.':old?'Purchase updated.':'Purchase saved.');});
+  const date=$('purchase-date').value;if(!validDate(date)){$('form-error').textContent='Choose a valid date.';return;}const old=records.find(r=>r.id===editingId);const record={...(old?.merchant?{merchant:old.merchant}:{}),id:old?.id||(globalThis.crypto?.randomUUID?.()||`p-${Date.now()}-${Math.random().toString(36).slice(2)}`),cents,category,note:$('note').value.trim(),date,createdAt:old?.createdAt||Date.now()};const next=old?records.map(r=>r.id===old.id?record:r):[...records,record];const rememberPurchaseId=purchaseStorage&&old?.merchant&&$('remember-category').checked?record.id:null;if(!await persist(next,rememberPurchaseId)){$('form-error').textContent='The purchase could not be saved. Your existing records are unchanged.';return;}$('purchase-dialog').close();anchor=parseDate(date);render();notify(rememberPurchaseId?'Purchase updated. Category remembered for this vendor.':isIncome(record)?(old?'Income updated.':'Income saved.'):old?'Purchase updated.':'Purchase saved.');});
 for(const id of ['overview-tab','mobile-overview'])$(id).addEventListener('click',()=>showView('overview'));
 for(const id of ['history-tab','mobile-history'])$(id).addEventListener('click',()=>showView('history'));
 function movePeriod(direction){anchor=new Date(anchor.getFullYear(),anchor.getMonth()+direction,1,12);selectedChartCategory=null;render();}
 $('previous-period').addEventListener('click',()=>movePeriod(-1));$('next-period').addEventListener('click',()=>movePeriod(1));
 $('category-filter').addEventListener('change',()=>renderHistory(filtered()));
 async function download(content,name,type){if(window.pocketNative){await window.pocketNative.exportFile(content,name);return;}const url=URL.createObjectURL(new Blob([content],{type})),a=document.createElement('a');a.href=url;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);}
-$('export-csv').addEventListener('click',async()=>{const cat=$('category-filter').value;const list=filtered().filter(r=>cat==='all'||r.category===cat);if(!list.length){notify('No purchases to export in this view.');return;}const cell=s=>`"${String(s).replace(/^[=+@-]/,"'$&").replace(/"/g,'""')}"`;try{await download('\uFEFFDate,Category,Amount (EUR),Note\r\n'+list.map(r=>[r.date,r.category,(r.cents/100).toFixed(2),r.note].map(cell).join(',')).join('\r\n'),`pocket-purchases-${localDate()}.csv`,'text/csv;charset=utf-8');notify(window.pocketNative?'CSV sharing finished.':'CSV exported.');}catch{notify('CSV export could not be completed. Try again.');}});
+$('export-csv').addEventListener('click',async()=>{const cat=$('category-filter').value;const list=filtered().filter(r=>cat==='all'||r.category===cat);if(!list.length){notify('No purchases to export in this view.');return;}const cell=s=>`"${String(s).replace(/^[=+@-]/,"'$&").replace(/"/g,'""')}"`;try{await download('\uFEFFDate,Category,Amount (EUR),Note,Type\r\n'+list.map(r=>[r.date,r.category,(r.cents/100).toFixed(2),r.note,isIncome(r)?'Income':'Expense'].map(cell).join(',')).join('\r\n'),`pocket-purchases-${localDate()}.csv`,'text/csv;charset=utf-8');notify(window.pocketNative?'CSV sharing finished.':'CSV exported.');}catch{notify('CSV export could not be completed. Try again.');}});
 $('backup-button').addEventListener('click',()=>{$('backup-error').textContent='';$('backup-dialog').showModal();});
 $('export-backup').addEventListener('click',async()=>{if(!storageReady||!storageHealthy){$('backup-error').textContent='Stored data could not be read. Recover the original browser storage before exporting.';return;}$('backup-error').textContent='';try{await download(JSON.stringify({app:'pocket',version:1,exportedAt:new Date().toISOString(),purchases:records},null,2),`pocket-backup-${localDate()}.json`,'application/json');notify(window.pocketNative?'Backup sharing finished.':'Backup downloaded.');}catch{$('backup-error').textContent='Backup export could not be completed. Try again.';}});
 $('import-backup').addEventListener('change',async e=>{const file=e.target.files[0];if(!file)return;try{if(file.size>10000000)throw new Error('This file is too large. Choose a Pocket JSON backup under 10 MB.');const data=JSON.parse(await file.text());const purchases=normalizeCategories(data.purchases);if(data.app!=='pocket'||data.version!==1||!validRecords(purchases))throw new Error('Choose a valid Pocket backup file.');const existing=new Set(records.map(r=>r.id));const added=purchases.filter(r=>!existing.has(r.id));if(!await persist([...records,...added]))throw new Error('The backup could not be saved.');render();$('backup-dialog').close();notify(`${added.length} purchase${added.length===1?'':'s'} restored.`);}catch(err){$('backup-error').textContent=err instanceof SyntaxError?'This file is not a valid JSON backup.':err.message;}e.target.value='';});

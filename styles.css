@@ -53,6 +53,9 @@ input, select, .primary-button, .secondary-button { min-height: 48px; }
 .tabs button, .text-button, .toast button { min-height: 44px; }
 .category-picker button { min-height: 80px; padding-block: 16px; font-size: 1.125rem; overflow-wrap: anywhere; }
 .category-icon { width: 40px; height: 40px; }
+.category-sections { display: flex; flex-direction: column; gap: 22px; min-width: 0; }
+.income-add { font-size: .875rem; gap: 6px; }
+#income-list { margin-top: 18px; }
 .category-details { border-bottom: 1px solid var(--line); }
 .category-details:last-child { border-bottom: 0; }
 .category-row { min-height: 64px; border-bottom: 0; cursor: pointer; }

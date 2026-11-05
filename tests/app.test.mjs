@@ -147,6 +147,47 @@ test('overview categories reorder as monthly spending changes', async () => {
   a.node('previous-period').handlers.click();
   assert.deepEqual(order().slice(0, 3), ['House', 'Investing', 'Paysera']);
 });
+test('income entries save separately from spending and support history, edits and backups', async () => {
+  const a = app();
+  await a.run('document').handlers.click({
+    target: { closest: selector => selector === '[data-add-income]' ? {} : null },
+  });
+  assert.equal(a.node('form-title').textContent, 'Add income');
+  assert.equal(a.node('purchase-category').value, '');
+  assert.match(a.node('category-picker').innerHTML, /data-category="Salary"/);
+  assert.match(a.node('category-picker').innerHTML, /data-category="Other"/);
+  assert.doesNotMatch(a.node('category-picker').innerHTML, /data-category="Food"/);
+
+  await a.submit('2000', 'Salary', '2026-10-13', 'October salary');
+  await a.submit('50', 'Other', '2026-10-13', 'Sold a bookcase');
+  await a.submit('12.50', 'Food', '2026-10-13', 'Lunch');
+  assert.equal(a.node('total-spent').textContent, '€12.50');
+  assert.equal(a.node('purchase-count').textContent, '1 purchase');
+  assert.match(a.node('income-list').innerHTML, /October salary/);
+  assert.match(a.node('income-list').innerHTML, /\+€2,000\.00/);
+  assert.doesNotMatch(a.node('category-list').innerHTML, /October salary|Sold a bookcase/);
+  assert.doesNotMatch(a.node('spending-chart').innerHTML, /data-chart-category="Salary"/);
+
+  a.node('category-filter').value = 'Salary';
+  a.run('renderHistory(filtered())');
+  assert.match(a.node('history-list').innerHTML, /October salary/);
+  assert.doesNotMatch(a.node('history-list').innerHTML, /Lunch/);
+  a.run('openPurchase(records[0])');
+  assert.equal(a.node('form-title').textContent, 'Edit income');
+  await a.submit('2100', 'Salary', '2026-10-13', 'Updated salary');
+  assert.equal(a.node('total-spent').textContent, '€12.50');
+
+  const restored = app(a.storage.get('pocket.purchases.v1'));
+  restored.run("anchor=parseDate('2026-10-13'); render()");
+  assert.equal(restored.node('total-spent').textContent, '€12.50');
+  assert.match(restored.node('income-list').innerHTML, /Updated salary/);
+
+  let csv;
+  a.run('window.pocketNative = {}');
+  a.run('window').pocketNative.exportFile = async content => { csv = content; };
+  await a.node('export-csv').handlers.click();
+  assert.match(csv, /"Salary","2100\.00","Updated salary","Income"/);
+});
 test('chart slices show monthly category spending and can return to the total', async () => {
   const a = app();
   await a.submit('12.50', 'Food');
@@ -213,7 +254,7 @@ test('editing replaces the original record and category filtering safely renders
   a.node('category-filter').value='Car'; a.run('renderHistory(filtered())');
   assert.ok(a.node('history-list').innerHTML.includes('Fuel'));
   a.node('category-filter').value='Food'; a.run('renderHistory(filtered())');
-  assert.ok(a.node('history-list').innerHTML.includes('No purchases found'));
+  assert.ok(a.node('history-list').innerHTML.includes('No entries found'));
 });
 test('storage failure leaves existing state unchanged', async () => {
   const a = app(null,true); await a.submit('10');

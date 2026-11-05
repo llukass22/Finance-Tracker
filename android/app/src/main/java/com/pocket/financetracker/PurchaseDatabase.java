@@ -20,7 +20,8 @@ import java.util.Set;
 public final class PurchaseDatabase extends SQLiteOpenHelper {
     private static final Set<String> CATEGORIES = new HashSet<>(Arrays.asList(
         "Car", "House", "Investing", "Paysera", "Eating Out", "Food", "Drinks", "Subscriptions",
-        "Sports", "Clothes", "Shipping Labels", "Gifts", "Transport", "Uncategorized"));
+        "Sports", "Clothes", "Shipping Labels", "Gifts", "Transport", "Uncategorized",
+        "Salary", "Other"));
 
     public PurchaseDatabase(Context context) { this(context, "pocket-purchases.db"); }
     PurchaseDatabase(Context context, String name) { super(context, name, null, 5); }

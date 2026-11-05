@@ -41,6 +41,20 @@ public class PurchaseDatabaseTest {
         assertEquals("new", state.getJSONArray("purchases").getJSONObject(0).getString("id"));
     }
 
+    @Test public void incomeCategoriesSaveAlongsideExistingExpenses() throws Exception {
+        database.migrate(new JSONArray().put(record("expense", 1250)));
+        database.applyChanges(new JSONArray()
+            .put(record("salary", 200000).put("category", "Salary"))
+            .put(record("other", 5000).put("category", "Other")), new JSONArray());
+        database.close();
+        database = new PurchaseDatabase(context, name);
+        JSONArray records = database.read().getJSONArray("purchases");
+        assertEquals(3, records.length());
+        java.util.Set<String> categories = new java.util.HashSet<>();
+        for (int i = 0; i < records.length(); i++) categories.add(records.getJSONObject(i).getString("category"));
+        assertTrue(categories.containsAll(java.util.Arrays.asList("Food", "Salary", "Other")));
+    }
+
     @Test public void invalidBatchCannotDeleteOrPartiallySave() throws Exception {
         database.migrate(new JSONArray().put(record("old", 1250)));
         try {
