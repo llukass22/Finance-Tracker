@@ -18,6 +18,7 @@ uncategorized:'<circle cx="12" cy="12" r="9"/><path d="M9 9a3 3 0 0 1 6 0c0 2-3 
 edit:'<path d="m15 4 5 5M3 21l5-1L21 7a2 2 0 0 0-5-5L3 15Z"/>',
 trash:'<path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7m4-7v7"/>',
 backup:'<path d="M12 3v12m-4-4 4 4 4-4M4 14v6h16v-6"/>',
+settings:'<path d="M9 2h6l.5 2.5 2 1.2 2.4-.8 2.5 4.3-1.9 1.8v2l1.9 1.8-2.5 4.3-2.4-.8-2 1.2L15 22H9l-.5-2.5-2-1.2-2.4.8-2.5-4.3L3.5 13v-2L1.6 9.2l2.5-4.3 2.4.8 2-1.2Z"/><circle cx="12" cy="12" r="3"/>',
 moon:'<path d="M20.9 13A9 9 0 0 1 11 3.1 9 9 0 1 0 20.9 13Z"/>',
 sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/>'
 };
@@ -248,6 +249,7 @@ function showView(view){const overview=view==='overview';$('overview').hidden=!o
 function selectCategory(name){$('purchase-category').value=name;for(const button of $('category-picker').children){const on=button.dataset.category===name;button.classList.toggle('active',on);button.setAttribute('aria-pressed',on);}}
 function openPurchase(record=null){editingId=record?.id||null;$('purchase-form').reset();$('form-title').textContent=record?'Edit purchase':'Add a purchase';$('amount').value=record?(record.cents/100).toFixed(2):'';$('note').value=record?.note||'';$('purchase-date').value=record?.date||localDate();$('form-error').textContent='';$('remember-category').checked=false;$('remember-category-option').hidden=!(purchaseStorage&&record?.merchant&&record.merchant.normalize('NFD').replace(/[\u0300-\u036f]/g,'').match(/[\p{L}\p{N}]/u));$('remember-vendor').textContent=record?.merchant||'';selectCategory(record?.category||'');$('purchase-dialog').showModal();setTimeout(()=>$('amount').focus(),50);}
 $('backup-button').innerHTML=icon('backup');
+$('settings-button').innerHTML=icon('settings');
 $('settings-button').addEventListener('click',()=>$('settings-dialog').showModal());
 for(const c of categories){$('purchase-category').add(new Option(c.name,c.name));$('category-filter').add(new Option(c.name,c.name));}
 $('category-picker').innerHTML = categories.map(category => `
