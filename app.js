@@ -337,7 +337,49 @@ function renderCategoryPicker(definitions) {
 }
 renderCategoryPicker(categories);
 $('category-picker').addEventListener('click',e=>{const b=e.target.closest('[data-category]');if(b)selectCategory(b.dataset.category);});
-document.addEventListener('click',async e=>{const incomeAdd=e.target.closest('[data-add-income]');if(incomeAdd){openPurchase(null,true);return;}const add=e.target.closest('[data-add]');if(add){openPurchase();return;}const edit=e.target.closest('[data-edit]');if(edit){const r=records.find(r=>r.id===edit.dataset.edit);if(r)openPurchase(r);return;}const del=e.target.closest('[data-delete]');if(del){const r=records.find(r=>r.id===del.dataset.delete);if(r&&await persist(records.filter(x=>x.id!==r.id))){deletedRecord=r;render();notify('Purchase deleted.',true);}}if(e.target.closest('.close-dialog'))e.target.closest('dialog').close();});
+
+const mobileAdd = $('mobile-add');
+const mobileAddOptions = $('mobile-add-options');
+function mobileAddIsOpen() {
+  return mobileAdd.getAttribute('aria-expanded') === 'true';
+}
+function setMobileAddOpen(open) {
+  mobileAdd.setAttribute('aria-expanded', String(open));
+  if (!open && mobileAddOptions.contains(document.activeElement)) mobileAdd.focus();
+  mobileAddOptions.inert = !open;
+}
+mobileAdd.addEventListener('click', () => setMobileAddOpen(!mobileAddIsOpen()));
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape' && mobileAddIsOpen()) setMobileAddOpen(false);
+});
+document.addEventListener('click', async event => {
+  const target = event.target;
+  if (mobileAddIsOpen() && !mobileAdd.contains(target)) setMobileAddOpen(false);
+  if (target.closest('[data-add-income]')) {
+    openPurchase(null, true);
+    return;
+  }
+  if (target.closest('[data-add]')) {
+    openPurchase();
+    return;
+  }
+  const edit = target.closest('[data-edit]');
+  if (edit) {
+    const record = records.find(record => record.id === edit.dataset.edit);
+    if (record) openPurchase(record);
+    return;
+  }
+  const remove = target.closest('[data-delete]');
+  if (remove) {
+    const record = records.find(record => record.id === remove.dataset.delete);
+    if (record && await persist(records.filter(entry => entry.id !== record.id))) {
+      deletedRecord = record;
+      render();
+      notify('Purchase deleted.', true);
+    }
+  }
+  if (target.closest('.close-dialog')) target.closest('dialog').close();
+});
 $('undo-delete').addEventListener('click',async()=>{if(deletedRecord&&await persist([...records,deletedRecord])){deletedRecord=null;render();notify('Purchase restored.');}});
 $('purchase-form').addEventListener('submit',async e=>{e.preventDefault();const raw=$('amount').value.trim().replace(',','.');if(!/^\d{1,9}(\.\d{1,2})?$/.test(raw)){$('form-error').textContent='Enter an amount with up to two decimal places, such as 12.50.';return;}const cents=Math.round(Number(raw)*100);if(cents<=0||cents>99999999999){$('form-error').textContent='Enter an amount greater than €0.00 and up to €999,999,999.99.';return;}
   const category = $('purchase-category').value;

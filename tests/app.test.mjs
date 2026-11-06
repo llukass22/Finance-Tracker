@@ -13,7 +13,9 @@ function app(stored = null, failSave = false, theme = null, purchases = null) {
       value: id === 'category-filter' ? 'all' : '',
       innerHTML: '', textContent: '', hidden: false, children: [], handlers: {},
       querySelectorAll() { return []; },
-      attributes: {}, classList: { toggle() {} }, setAttribute(key, value) { this.attributes[key] = value; }, add() {}, focus() {},
+      attributes: {}, classList: { toggle() {} }, setAttribute(key, value) { this.attributes[key] = value; },
+      getAttribute(key) { return this.attributes[key] ?? null; },
+      contains(child) { return this === child || this.children.includes(child); }, add() {}, focus() {},
       addEventListener(type, fn) { this.handlers[type] = fn; },
       showModal() { this.open = true; }, close() { this.open = false; }, reset() {},
     });
@@ -113,6 +115,42 @@ test('opening a new purchase clears the previous category and requires an explic
   a.run('openPurchase(records[0])');
   assert.equal(a.node('purchase-category').value, 'Food');
   assert.equal(food.attributes['aria-pressed'], true);
+});
+test('mobile add menu opens both entry forms and can be dismissed without opening a form', async () => {
+  const a = app();
+  const button = a.node('mobile-add');
+  const options = a.node('mobile-add-options');
+  const dialog = a.node('purchase-dialog');
+  const handlers = a.run('document.handlers');
+  const choose = selector => handlers.click({ target: { closest: value => value === selector ? {} : null } });
+
+  button.handlers.click();
+  assert.equal(button.getAttribute('aria-expanded'), 'true');
+  assert.equal(options.inert, false);
+  await choose('[data-add-income]');
+  assert.equal(button.getAttribute('aria-expanded'), 'false');
+  assert.equal(options.inert, true);
+  assert.equal(dialog.open, true);
+  assert.equal(a.node('form-title').textContent, 'Add income');
+  assert.match(a.node('category-picker').innerHTML, /data-category="Salary"/);
+  dialog.close();
+
+  button.handlers.click();
+  await choose('[data-add]');
+  assert.equal(options.inert, true);
+  assert.equal(dialog.open, true);
+  assert.equal(a.node('form-title').textContent, 'Add expense');
+  assert.match(a.node('category-picker').innerHTML, /data-category="Food"/);
+  dialog.close();
+
+  button.handlers.click();
+  await choose(null);
+  assert.equal(options.inert, true);
+  assert.equal(dialog.open, false);
+  button.handlers.click();
+  handlers.keydown({ key: 'Escape' });
+  assert.equal(button.getAttribute('aria-expanded'), 'false');
+  assert.equal(options.inert, true);
 });
 test('category disclosures prefer monthly purchase notes and fall back to titles', () => {
   const a = app(JSON.stringify([

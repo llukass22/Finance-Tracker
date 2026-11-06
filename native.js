@@ -33,8 +33,11 @@ if (Capacitor.isNativePlatform()) {
   }
   App.addListener('backButton', async () => {
     const dialog = document.querySelector('dialog[open]');
+    const addMenu = document.querySelector('#mobile-add[aria-expanded="true"]');
     if (dialog) {
       dialog.close();
+    } else if (addMenu) {
+      addMenu.click();
     } else if (!document.getElementById('history').hidden) {
       document.getElementById('overview-tab').click();
     } else {
