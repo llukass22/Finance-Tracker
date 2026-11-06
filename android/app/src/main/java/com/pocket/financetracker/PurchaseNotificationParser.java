@@ -22,6 +22,8 @@ public final class PurchaseNotificationParser {
     private static final Pattern AT_MERCHANT = Pattern.compile("(?:^|\\b)(?:at|to)\\s+(.+)$", Pattern.CASE_INSENSITIVE);
     private static final Pattern SWEDBANK_HEADING = Pattern.compile("^Notification from Swedbank ", Pattern.CASE_INSENSITIVE);
     private static final Pattern SWEDBANK_OUTGOING = Pattern.compile("^(" + NUMBER + ") EUR has been sent to (.+)$", Pattern.CASE_INSENSITIVE);
+    private static final Pattern SWEDBANK_PAID_AT = Pattern.compile(
+        "(?<![\\p{L}\\p{N}.,+-])([+-]?" + NUMBER + ") EUR paid at (.+)$", Pattern.CASE_INSENSITIVE);
     private static final String SEB_HEADING = "Nauja operacija";
     private static final Pattern SEB_OUTGOING = Pattern.compile("^Pervedėte\\s+(" + NUMBER + ")\\s+(" + CODE + ")\\s+(.+)$", Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
     private static final Pattern SEB_PURPOSE = Pattern.compile("\\s+Paskirtis\\s*:.*$", Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
@@ -122,18 +124,47 @@ public final class PurchaseNotificationParser {
         return payment;
     }
 
-    /** Swedbank Lietuva's English outgoing transfer format. */
-    public static Result parseSwedbank(String text, String bigText) {
-        for (String field : new String[]{text, bigText}) {
+    /** Swedbank Lietuva's English transfer and card payment formats. */
+    public static Result parseSwedbank(String title, String text, String bigText, String subText) {
+        for (String field : new String[]{title, text, bigText, subText}) {
             if (field != null && field.length() > 10000) return review("text_too_long");
         }
         String body = SWEDBANK_HEADING.matcher(normalize(text)).replaceFirst("");
         String expanded = SWEDBANK_HEADING.matcher(normalize(bigText)).replaceFirst("");
-        if (!expanded.startsWith(body) && !body.startsWith(expanded)) {
+        boolean bodiesAgree = expanded.startsWith(body) || body.startsWith(expanded);
+        String transaction = expanded.length() > body.length() ? expanded : body;
+        if (bodiesAgree) {
+            Matcher outgoing = SWEDBANK_OUTGOING.matcher(transaction);
+            if (outgoing.matches()) return swedbankExpense(outgoing);
+        } else if (SWEDBANK_OUTGOING.matcher(body).matches() || SWEDBANK_OUTGOING.matcher(expanded).matches()) {
             return review("conflicting_notification_text");
         }
-        Matcher outgoing = SWEDBANK_OUTGOING.matcher(expanded.length() > body.length() ? expanded : body);
-        if (!outgoing.matches()) return new Result("ignored", "not_swedbank_outgoing_payment", null, null, null);
+
+        String[] fields = bodiesAgree
+            ? new String[]{normalize(title), transaction, normalize(subText)}
+            : new String[]{normalize(title), body, expanded, normalize(subText)};
+        Result payment = null;
+        for (String field : fields) {
+            Matcher paidAt = SWEDBANK_PAID_AT.matcher(field);
+            if (!paidAt.find()) continue;
+            Result candidate = swedbankExpense(paidAt);
+            if (!"parsed".equals(candidate.status)) return candidate;
+            if (payment != null && (!payment.cents.equals(candidate.cents) || !payment.merchant.equals(candidate.merchant))) {
+                return review("conflicting_notification_text");
+            }
+            payment = candidate;
+        }
+        if (payment == null) {
+            if (!bodiesAgree) return review("conflicting_notification_text");
+            return new Result("ignored", "not_swedbank_outgoing_payment", null, null, null);
+        }
+        String all = String.join("\n", fields);
+        if (NON_PURCHASE.matcher(all).find()) return new Result("ignored", "non_purchase_message", null, null, null);
+        if (UNCERTAIN.matcher(all).find()) return review("uncertain_transaction");
+        return payment;
+    }
+
+    private static Result swedbankExpense(Matcher outgoing) {
         Long value = cents(outgoing.group(1));
         if (value == null) return review("invalid_or_ambiguous_amount");
         String recipient = merchant(outgoing.group(2).replaceFirst("\\.$", ""));

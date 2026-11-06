@@ -36,7 +36,7 @@ The APK includes a `PocketNotificationListener` service and a local `Notificatio
 | Google Wallet (`com.google.android.apps.walletnfcrel`) | A purchase alert with a clear amount and merchant, such as `€3.50 with SEB Debit Mastercard` under the merchant's name. |
 | Google Play services (`com.google.android.gms`) | An alert with a clear amount and merchant plus payment or card wording, such as `You paid €3.50 at Shop`. |
 | SEB Lietuva (`se.seb.lithuania`) | `Nauja operacija` followed by `Pervedėte <amount> EUR <recipient>`. Pocket records the outgoing payment and excludes the `Paskirtis:` reference. [Google Play listing](https://play.google.com/store/apps/details?id=se.seb.lithuania) |
-| Swedbank Lietuva (`lt.swedbank.mobile`) | `<amount> EUR has been sent to <recipient>`. For example, `5 EUR has been sent to Example Recipient` records a €5.00 outgoing payment to Example Recipient. [Google Play listing](https://play.google.com/store/apps/details?id=lt.swedbank.mobile) |
+| Swedbank Lietuva (`lt.swedbank.mobile`) | `<amount> EUR has been sent to <recipient>` or `<amount> EUR paid at <merchant>`. For example, `1.99 EUR paid at WL*GOOGLE Dublin IE.` records a €1.99 expense for `WL*GOOGLE Dublin IE`. [Google Play listing](https://play.google.com/store/apps/details?id=lt.swedbank.mobile) |
 
 Automatic import requires a completed EUR payment with a clear merchant or recipient. The bank rules skip incoming transfers and unrelated alerts. Google Wallet and Google Play services notifications containing `Paysera Visa Card` anywhere in the title, body, expanded text, or subtext are ignored. The exclusion accepts differences in letter case and whitespace.
 
@@ -103,7 +103,7 @@ This creates a EUR 18.30 expense with `Lietuvos paštas AB` as the merchant/note
 
 Run the SEB tests with `./gradlew.bat :app:testDebugUnitTest --tests com.pocket.financetracker.SebNotificationParserTest` from the `android` directory.
 
-Swedbank Lietuva imports English notifications in the format `5 EUR has been sent to Example Recipient` as outgoing EUR expenses. It checks the source package and skips incoming transfers and unrelated alerts.
+Swedbank Lietuva imports English outgoing transfer and card payment notifications as EUR expenses. The card payment rule looks for an amount followed by `EUR paid at` and the merchant in the title, body, expanded text, or subtext. It skips incoming transfers and unrelated alerts.
 
 ## Run
 

@@ -70,6 +70,55 @@ public class WalletNotificationRouterTest {
         assertEquals("LUKAS RUZEVICIUS", purchase.merchant);
     }
 
+    @Test public void swedbankPaidAtCreatesAnExpenseFromAnyTextField() {
+        String payment = "1.99 EUR paid at WL*GOOGLE Dublin IE.";
+        for (int field = 0; field < 4; field++) {
+            String[] fields = {"Notification from Swedbank", null, null, null};
+            fields[field] = "Notification from Swedbank\n" + payment;
+            PurchaseNotificationParser.Result parsed = WalletNotificationRouter.parse(
+                "lt.swedbank.mobile", false, fields[0], fields[1], fields[2], fields[3]);
+            NotificationPurchase purchase = NotificationPurchase.from(parsed, "swedbank-key", 1792400000000L);
+            assertNotNull("Notification field " + field, purchase);
+            assertEquals(199, purchase.cents);
+            assertEquals("WL*GOOGLE Dublin IE", purchase.merchant);
+        }
+    }
+
+    @Test public void swedbankPaidAtHandlesAnExpandedNotificationWithLeadingText() {
+        PurchaseNotificationParser.Result parsed = WalletNotificationRouter.parse(
+            "lt.swedbank.mobile", false, "Notification from Swedbank", "Card payment: 1,99 EUR",
+            "Card payment: 1,99 EUR PAID AT\nWL*GOOGLE Dublin IE.", null);
+        assertEquals("parsed", parsed.status);
+        assertEquals(Long.valueOf(199), parsed.cents);
+        assertEquals("WL*GOOGLE Dublin IE", parsed.merchant);
+    }
+
+    @Test public void swedbankPaidAtReadsExpandedDetailsAndRejectsConflictingPayments() {
+        String source = "lt.swedbank.mobile";
+        String title = "Notification from Swedbank";
+        String payment = "1.99 EUR paid at WL*GOOGLE Dublin IE.";
+        PurchaseNotificationParser.Result parsed = WalletNotificationRouter.parse(
+            source, false, title, "Card payment", payment, null);
+        assertEquals("parsed", parsed.status);
+        assertEquals(Long.valueOf(199), parsed.cents);
+
+        PurchaseNotificationParser.Result conflicting = WalletNotificationRouter.parse(
+            source, false, title, "2.99 EUR paid at WL*GOOGLE Dublin IE.", payment, null);
+        assertEquals("conflicting_notification_text", conflicting.reason);
+        assertNull(NotificationPurchase.from(conflicting, "swedbank-key", 1792400000000L));
+    }
+
+    @Test public void swedbankPaidAtRequiresACompletedPaymentWithAmountAndMerchant() {
+        for (String body : new String[]{
+                "Paid at WL*GOOGLE Dublin IE.", "1.99 USD paid at WL*GOOGLE Dublin IE.",
+                "-1.99 EUR paid at WL*GOOGLE Dublin IE.", "1.99 EUR paid at .",
+                "Payment declined: 1.99 EUR paid at WL*GOOGLE Dublin IE."}) {
+            PurchaseNotificationParser.Result parsed = WalletNotificationRouter.parse(
+                "lt.swedbank.mobile", false, "Notification from Swedbank", body, null, null);
+            assertNull(body, NotificationPurchase.from(parsed, "swedbank-key", 1792400000000L));
+        }
+    }
+
     @Test public void swedbankHandlesExpandedTextAndDecimalAmounts() {
         String body = "12,34 EUR has been sent to Example Recipient.";
         PurchaseNotificationParser.Result parsed = WalletNotificationRouter.parse(

@@ -25,7 +25,7 @@ public final class WalletNotificationRouter {
             String title, String text, String bigText, String subText) {
         if (!accepts(source, summary)) return null;
         if (SEB_LIETUVA.equals(source)) return PurchaseNotificationParser.parseSeb(title, text, bigText, subText);
-        if (SWEDBANK_LIETUVA.equals(source)) return PurchaseNotificationParser.parseSwedbank(text, bigText);
+        if (SWEDBANK_LIETUVA.equals(source)) return PurchaseNotificationParser.parseSwedbank(title, text, bigText, subText);
         return PurchaseNotificationParser.parse(title, text, bigText, subText);
     }
 
